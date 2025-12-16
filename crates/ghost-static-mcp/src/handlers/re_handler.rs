@@ -1143,6 +1143,16 @@ impl ReHandler {
     /// Fallback Radare2 handler when backend is disabled
     #[cfg(not(feature = "radare2"))]
     pub async fn handle_radare2_tool(name: &str, _args: &Value) -> Result<Value> {
+        // For status tool, return graceful "disabled" response instead of error
+        if name == "r2_status" {
+            return Ok(serde_json::json!({
+                "backend": "radare2",
+                "connected": false,
+                "enabled": false,
+                "info": null,
+                "message": "Radare2 backend is disabled (build without 'radare2' feature)"
+            }));
+        }
         Err(McpError::Handler(format!(
             "Radare2 backend support is disabled. Rebuild ghost-static-mcp with the 'radare2' feature to use {}",
             name
@@ -1152,6 +1162,16 @@ impl ReHandler {
     /// Fallback Ghidra handler when backend is disabled
     #[cfg(not(feature = "ghidra"))]
     pub async fn handle_ghidra_tool(name: &str, _args: &Value) -> Result<Value> {
+        // For status tool, return graceful "disabled" response instead of error
+        if name == "ghidra_status" {
+            return Ok(serde_json::json!({
+                "backend": "ghidra",
+                "connected": false,
+                "enabled": false,
+                "info": null,
+                "message": "Ghidra backend is disabled (build without 'ghidra' feature)"
+            }));
+        }
         Err(McpError::Handler(format!(
             "Ghidra backend support is disabled. Rebuild ghost-static-mcp with the 'ghidra' feature to use {}",
             name
@@ -1161,6 +1181,16 @@ impl ReHandler {
     /// Fallback IDA handler when backend is disabled
     #[cfg(not(feature = "ida"))]
     pub async fn handle_ida_tool(name: &str, _args: &Value) -> Result<Value> {
+        // For status tool, return graceful "disabled" response instead of error
+        if name == "ida_status" {
+            return Ok(serde_json::json!({
+                "backend": "ida",
+                "connected": false,
+                "enabled": false,
+                "info": null,
+                "message": "IDA backend is disabled (build without 'ida' feature)"
+            }));
+        }
         Err(McpError::Handler(format!(
             "IDA backend support is disabled. Rebuild ghost-static-mcp with the 'ida' feature to use {}",
             name
