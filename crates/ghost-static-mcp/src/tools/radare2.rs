@@ -87,6 +87,15 @@ fn r2_functions() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "limit".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Maximum number of functions to return (default: 100)".to_string()),
+            default: Some(serde_json::json!(100)),
+            enum_values: None,
+        },
+    );
 
     ToolDefinition::new("r2_functions", "List all functions", "radare2").with_schema(
         ToolInputSchema {
@@ -221,6 +230,24 @@ fn r2_strings() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by string content".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "limit".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Maximum number of strings to return (default: 100)".to_string()),
+            default: Some(serde_json::json!(100)),
+            enum_values: None,
+        },
+    );
 
     ToolDefinition::new("r2_strings", "List strings in binary", "radare2").with_schema(
         ToolInputSchema {
@@ -233,13 +260,47 @@ fn r2_strings() -> ToolDefinition {
 }
 
 fn r2_imports() -> ToolDefinition {
-    ToolDefinition::new("r2_imports", "List imported functions", "radare2")
-        .with_schema(ToolInputSchema::empty())
+    let mut props = HashMap::new();
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by import name".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+
+    ToolDefinition::new("r2_imports", "List imported functions", "radare2").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
+    )
 }
 
 fn r2_exports() -> ToolDefinition {
-    ToolDefinition::new("r2_exports", "List exported functions", "radare2")
-        .with_schema(ToolInputSchema::empty())
+    let mut props = HashMap::new();
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by export name".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+
+    ToolDefinition::new("r2_exports", "List exported functions", "radare2").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
+    )
 }
 
 fn r2_xref() -> ToolDefinition {

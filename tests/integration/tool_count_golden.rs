@@ -53,54 +53,19 @@ pub mod expected_counts {
 
 #[test]
 fn test_expected_counts_under_limit() {
-    assert!(
-        expected_counts::CORE <= MAX_TOOLS_PER_SERVER,
-        "Core expected count {} exceeds limit {}",
-        expected_counts::CORE,
-        MAX_TOOLS_PER_SERVER
-    );
-
-    assert!(
-        expected_counts::ANALYSIS <= MAX_TOOLS_PER_SERVER,
-        "Analysis expected count {} exceeds limit {}",
-        expected_counts::ANALYSIS,
-        MAX_TOOLS_PER_SERVER
-    );
-
-    assert!(
-        expected_counts::STATIC <= MAX_TOOLS_PER_SERVER,
-        "Static expected count {} exceeds limit {}",
-        expected_counts::STATIC,
-        MAX_TOOLS_PER_SERVER
-    );
-
-    assert!(
-        expected_counts::EXTENDED <= MAX_TOOLS_PER_SERVER,
-        "Extended expected count {} exceeds limit {}",
-        expected_counts::EXTENDED,
-        MAX_TOOLS_PER_SERVER
-    );
+    const { assert!(expected_counts::CORE <= MAX_TOOLS_PER_SERVER) };
+    const { assert!(expected_counts::ANALYSIS <= MAX_TOOLS_PER_SERVER) };
+    const { assert!(expected_counts::STATIC <= MAX_TOOLS_PER_SERVER) };
+    const { assert!(expected_counts::EXTENDED <= MAX_TOOLS_PER_SERVER) };
 }
 
 #[test]
 fn test_meta_tools_included_in_counts() {
     // Each server count should include the 4 shared meta tools
-    assert!(
-        expected_counts::CORE >= expected_counts::META_TOOLS,
-        "Core count should include meta tools"
-    );
-    assert!(
-        expected_counts::ANALYSIS >= expected_counts::META_TOOLS,
-        "Analysis count should include meta tools"
-    );
-    assert!(
-        expected_counts::STATIC >= expected_counts::META_TOOLS,
-        "Static count should include meta tools"
-    );
-    assert!(
-        expected_counts::EXTENDED >= expected_counts::META_TOOLS,
-        "Extended count should include meta tools"
-    );
+    const { assert!(expected_counts::CORE >= expected_counts::META_TOOLS) };
+    const { assert!(expected_counts::ANALYSIS >= expected_counts::META_TOOLS) };
+    const { assert!(expected_counts::STATIC >= expected_counts::META_TOOLS) };
+    const { assert!(expected_counts::EXTENDED >= expected_counts::META_TOOLS) };
 }
 
 #[test]
@@ -116,7 +81,7 @@ fn test_total_tools_reasonable() {
     let expected_total = total_unique;
 
     assert!(
-        total_unique >= 310 && total_unique <= 340,
+        (310..=340).contains(&total_unique),
         "Total unique tools {} should be around {}",
         total_unique,
         expected_total
@@ -201,7 +166,7 @@ fn test_all_servers_under_limit() {
     ];
 
     for (name, result) in registries {
-        let registry = result.expect(&format!("Failed to create {} registry", name));
+        let registry = result.unwrap_or_else(|_| panic!("Failed to create {} registry", name));
         assert!(
             registry.len() <= MAX_TOOLS_PER_SERVER,
             "{} has {} tools, exceeds limit of {}!",

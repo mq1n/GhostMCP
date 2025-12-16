@@ -279,7 +279,7 @@ impl ReHandler {
         }
     }
 
-    #[cfg(feature = "radare2")]
+    #[cfg(any(feature = "radare2", feature = "ghidra"))]
     fn parse_min_length(args: &Value, default_len: usize) -> usize {
         args.get("min_length")
             .and_then(|v| v.as_u64())
@@ -680,6 +680,10 @@ impl ReHandler {
                     let filter_lower = filter.to_lowercase();
                     functions.retain(|f| f.name.to_lowercase().contains(&filter_lower));
                 }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if functions.len() > limit {
+                    functions.truncate(limit);
+                }
                 Ok(json!({
                     "functions": functions,
                     "count": functions.len()
@@ -739,19 +743,35 @@ impl ReHandler {
                 Self::ensure_radare2_session().await?;
                 let min_length = Self::parse_min_length(args, 4);
                 let backend = Self::radare2_backend().await;
-                let strings = Self::map_r2_err(backend.list_strings(min_length).await)?;
+                let mut strings = Self::map_r2_err(backend.list_strings(min_length).await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    strings.retain(|s| s.value.to_lowercase().contains(&filter_lower));
+                }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if strings.len() > limit {
+                    strings.truncate(limit);
+                }
                 Ok(json!({ "strings": strings, "count": strings.len() }))
             }
             "r2_imports" => {
                 Self::ensure_radare2_session().await?;
                 let backend = Self::radare2_backend().await;
-                let imports = Self::map_r2_err(backend.list_imports().await)?;
+                let mut imports = Self::map_r2_err(backend.list_imports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    imports.retain(|i| i.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "imports": imports, "count": imports.len() }))
             }
             "r2_exports" => {
                 Self::ensure_radare2_session().await?;
                 let backend = Self::radare2_backend().await;
-                let exports = Self::map_r2_err(backend.list_exports().await)?;
+                let mut exports = Self::map_r2_err(backend.list_exports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    exports.retain(|e| e.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "exports": exports, "count": exports.len() }))
             }
             "r2_xref" => {
@@ -858,6 +878,10 @@ impl ReHandler {
                     let filter_lower = filter.to_lowercase();
                     functions.retain(|f| f.name.to_lowercase().contains(&filter_lower));
                 }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if functions.len() > limit {
+                    functions.truncate(limit);
+                }
                 Ok(json!({
                     "functions": functions,
                     "count": functions.len()
@@ -865,10 +889,17 @@ impl ReHandler {
             }
             "ghidra_function" => {
                 Self::ensure_ghidra_session().await?;
-                let address = require_address(args, "ghidra_function")?;
                 let backend = Self::ghidra_backend().await;
-                let func = Self::map_ghidra_err(backend.get_function(address).await)?;
-                Ok(json!({ "function": func }))
+                let result = if let Some(addr) = Self::validate_address(args)? {
+                    Self::map_ghidra_err(backend.get_function(addr).await)?
+                } else if let Some(name) = args.get("name").and_then(|n| n.as_str()) {
+                    Self::map_ghidra_err(backend.get_function_by_name(name).await)?
+                } else {
+                    return Err(McpError::InvalidParams(
+                        "Provide either 'address' or 'name' for ghidra_function".to_string(),
+                    ));
+                };
+                Ok(json!({ "function": result }))
             }
             "ghidra_disasm" => {
                 Self::ensure_ghidra_session().await?;
@@ -896,20 +927,37 @@ impl ReHandler {
             }
             "ghidra_strings" => {
                 Self::ensure_ghidra_session().await?;
+                let min_length = Self::parse_min_length(args, 4);
                 let backend = Self::ghidra_backend().await;
-                let strings = Self::map_ghidra_err(backend.list_strings(4).await)?;
+                let mut strings = Self::map_ghidra_err(backend.list_strings(min_length).await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    strings.retain(|s| s.value.to_lowercase().contains(&filter_lower));
+                }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if strings.len() > limit {
+                    strings.truncate(limit);
+                }
                 Ok(json!({ "strings": strings, "count": strings.len() }))
             }
             "ghidra_imports" => {
                 Self::ensure_ghidra_session().await?;
                 let backend = Self::ghidra_backend().await;
-                let imports = Self::map_ghidra_err(backend.list_imports().await)?;
+                let mut imports = Self::map_ghidra_err(backend.list_imports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    imports.retain(|i| i.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "imports": imports, "count": imports.len() }))
             }
             "ghidra_exports" => {
                 Self::ensure_ghidra_session().await?;
                 let backend = Self::ghidra_backend().await;
-                let exports = Self::map_ghidra_err(backend.list_exports().await)?;
+                let mut exports = Self::map_ghidra_err(backend.list_exports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    exports.retain(|e| e.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "exports": exports, "count": exports.len() }))
             }
             "ghidra_xref" => {
@@ -990,6 +1038,10 @@ impl ReHandler {
                     let filter_lower = filter.to_lowercase();
                     functions.retain(|f| f.name.to_lowercase().contains(&filter_lower));
                 }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if functions.len() > limit {
+                    functions.truncate(limit);
+                }
                 Ok(json!({
                     "functions": functions,
                     "count": functions.len()
@@ -997,10 +1049,17 @@ impl ReHandler {
             }
             "ida_function" => {
                 Self::ensure_ida_session().await?;
-                let address = require_address(args, "ida_function")?;
                 let mut backend = Self::ida_backend().await;
-                let func = Self::map_ida_err(backend.get_function(address).await)?;
-                Ok(json!({ "function": func }))
+                let result = if let Some(addr) = Self::validate_address(args)? {
+                    Self::map_ida_err(backend.get_function(addr).await)?
+                } else if let Some(name) = args.get("name").and_then(|n| n.as_str()) {
+                    Self::map_ida_err(backend.get_function_by_name(name).await)?
+                } else {
+                    return Err(McpError::InvalidParams(
+                        "Provide either 'address' or 'name' for ida_function".to_string(),
+                    ));
+                };
+                Ok(json!({ "function": result }))
             }
             "ida_disasm" => {
                 Self::ensure_ida_session().await?;
@@ -1029,19 +1088,36 @@ impl ReHandler {
             "ida_strings" => {
                 Self::ensure_ida_session().await?;
                 let mut backend = Self::ida_backend().await;
-                let strings = Self::map_ida_err(backend.list_strings(4).await)?;
+                let min_length = Self::parse_min_length(args, 4);
+                let mut strings = Self::map_ida_err(backend.list_strings(min_length).await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    strings.retain(|s| s.value.to_lowercase().contains(&filter_lower));
+                }
+                let limit = args.get("limit").and_then(|l| l.as_u64()).unwrap_or(100) as usize;
+                if strings.len() > limit {
+                    strings.truncate(limit);
+                }
                 Ok(json!({ "strings": strings, "count": strings.len() }))
             }
             "ida_imports" => {
                 Self::ensure_ida_session().await?;
                 let mut backend = Self::ida_backend().await;
-                let imports = Self::map_ida_err(backend.list_imports().await)?;
+                let mut imports = Self::map_ida_err(backend.list_imports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    imports.retain(|i| i.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "imports": imports, "count": imports.len() }))
             }
             "ida_exports" => {
                 Self::ensure_ida_session().await?;
                 let mut backend = Self::ida_backend().await;
-                let exports = Self::map_ida_err(backend.list_exports().await)?;
+                let mut exports = Self::map_ida_err(backend.list_exports().await)?;
+                if let Some(filter) = args.get("filter").and_then(|f| f.as_str()) {
+                    let filter_lower = filter.to_lowercase();
+                    exports.retain(|e| e.name.to_lowercase().contains(&filter_lower));
+                }
                 Ok(json!({ "exports": exports, "count": exports.len() }))
             }
             "ida_xref" => {

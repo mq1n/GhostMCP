@@ -18,6 +18,7 @@
 pub mod backend;
 mod ipc;
 pub mod multi_client;
+pub mod safety;
 
 use ghost_common::{error, info, init_agent_logging};
 use multi_client::MultiClientServer;

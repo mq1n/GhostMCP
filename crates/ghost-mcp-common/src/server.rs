@@ -3,11 +3,14 @@
 //! Provides reusable server infrastructure with stdio and TCP transports.
 
 use crate::config::ServerConfig;
+use crate::data;
 use crate::error::{McpError, Result};
 use crate::ipc::{AgentClient, SharedAgentClient};
 use crate::meta::{ServerIdentity, SharedMetaTools};
 use crate::registry::ToolRegistry;
+use crate::types::{Prompt, Resource};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
@@ -35,12 +38,18 @@ pub struct McpServer {
     config: ServerConfig,
     /// Tool registry
     registry: Arc<RwLock<ToolRegistry>>,
+    /// Registered prompts
+    prompts: Arc<RwLock<HashMap<String, Prompt>>>,
+    /// Registered resources
+    resources: Arc<RwLock<Vec<Resource>>>,
     /// Agent client
     agent: SharedAgentClient,
     /// Shared meta tools handler
     meta_tools: Arc<SharedMetaTools>,
     /// Custom tool handler
     tool_handler: Option<Arc<dyn ToolHandlerFn>>,
+    /// Custom prompt handler
+    prompt_handler: Option<Arc<dyn PromptHandlerFn>>,
 }
 
 /// Trait for custom tool handlers
@@ -50,6 +59,15 @@ pub trait ToolHandlerFn: Send + Sync {
         name: String,
         args: serde_json::Value,
         agent: SharedAgentClient,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send + '_>>;
+}
+
+/// Trait for custom prompt handlers
+pub trait PromptHandlerFn: Send + Sync {
+    fn handle(
+        &self,
+        name: String,
+        args: serde_json::Value,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>>;
 }
 
@@ -63,9 +81,24 @@ where
         name: String,
         args: serde_json::Value,
         agent: SharedAgentClient,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>>
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send + '_>>
     {
         Box::pin(self(name, args, agent))
+    }
+}
+
+impl<F, Fut> PromptHandlerFn for F
+where
+    F: Fn(String, serde_json::Value) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output = Result<serde_json::Value>> + Send + 'static,
+{
+    fn handle(
+        &self,
+        name: String,
+        args: serde_json::Value,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>>
+    {
+        Box::pin(self(name, args))
     }
 }
 
@@ -114,13 +147,44 @@ impl McpServer {
             error!("Failed to register meta tools: {}", e);
         }
 
+        // Load prompts
+        let mut prompts = HashMap::new();
+        match data::parse_prompts_list() {
+            Ok(json) => match serde_json::from_value::<Vec<Prompt>>(json) {
+                Ok(list) => {
+                    for p in list {
+                        prompts.insert(p.name.clone(), p);
+                    }
+                    debug!("Loaded {} prompts from embedded data", prompts.len());
+                }
+                Err(e) => error!("Failed to deserialize prompts: {}", e),
+            },
+            Err(e) => error!("Failed to load prompts: {}", e),
+        }
+
+        // Load resources
+        let mut resources = Vec::new();
+        match data::parse_resources_list() {
+            Ok(json) => match serde_json::from_value::<Vec<Resource>>(json) {
+                Ok(list) => {
+                    resources = list;
+                    debug!("Loaded {} resources from embedded data", resources.len());
+                }
+                Err(e) => error!("Failed to deserialize resources: {}", e),
+            },
+            Err(e) => error!("Failed to load resources: {}", e),
+        }
+
         Self {
             identity,
             agent: Arc::new(AgentClient::with_config(config.clone())),
             config,
             registry: Arc::new(RwLock::new(registry)),
+            prompts: Arc::new(RwLock::new(prompts)),
+            resources: Arc::new(RwLock::new(resources)),
             meta_tools,
             tool_handler: None,
+            prompt_handler: None,
         }
     }
 
@@ -151,6 +215,20 @@ impl McpServer {
     pub fn with_tool_handler<H: ToolHandlerFn + 'static>(mut self, handler: H) -> Self {
         self.tool_handler = Some(Arc::new(handler));
         self
+    }
+
+    /// Set custom prompt handler
+    pub fn with_prompt_handler<H: PromptHandlerFn + 'static>(mut self, handler: H) -> Self {
+        self.prompt_handler = Some(Arc::new(handler));
+        self
+    }
+
+    /// Register prompts
+    pub async fn register_prompts(&self, prompts: Vec<Prompt>) {
+        let mut registry = self.prompts.write().await;
+        for prompt in prompts {
+            registry.insert(prompt.name.clone(), prompt);
+        }
     }
 
     /// Get mutable access to registry for tool registration
@@ -407,7 +485,7 @@ impl McpServer {
 
     /// Handle initialize
     async fn handle_initialize(&self, _params: &serde_json::Value) -> Result<serde_json::Value> {
-        let registry = self.registry.read().await;
+        let registry: tokio::sync::RwLockReadGuard<ToolRegistry> = self.registry.read().await;
         Ok(serde_json::json!({
             "protocolVersion": "2024-11-05",
             "serverInfo": {
@@ -437,7 +515,7 @@ impl McpServer {
 
     /// Handle tools/list
     async fn handle_tools_list(&self) -> Result<serde_json::Value> {
-        let registry = self.registry.read().await;
+        let registry: tokio::sync::RwLockReadGuard<ToolRegistry> = self.registry.read().await;
         let tools = registry.to_mcp_tools();
         Ok(serde_json::json!({ "tools": tools }))
     }
@@ -459,19 +537,23 @@ impl McpServer {
         // Check if it's a meta tool
         match name {
             "mcp_capabilities" => {
-                let registry = self.registry.read().await;
+                let registry: tokio::sync::RwLockReadGuard<ToolRegistry> =
+                    self.registry.read().await;
                 return self.meta_tools.handle_capabilities(&args, &registry);
             }
             "mcp_documentation" => {
-                let registry = self.registry.read().await;
+                let registry: tokio::sync::RwLockReadGuard<ToolRegistry> =
+                    self.registry.read().await;
                 return self.meta_tools.handle_documentation(&args, &registry);
             }
             "mcp_version" => {
-                let registry = self.registry.read().await;
+                let registry: tokio::sync::RwLockReadGuard<ToolRegistry> =
+                    self.registry.read().await;
                 return self.meta_tools.handle_version(&registry);
             }
             "mcp_health" => {
-                let registry = self.registry.read().await;
+                let registry: tokio::sync::RwLockReadGuard<ToolRegistry> =
+                    self.registry.read().await;
                 return self
                     .meta_tools
                     .handle_health(Some(&self.agent), &registry)
@@ -496,7 +578,7 @@ impl McpServer {
 
         // Check registry for tool with handler
         {
-            let registry = self.registry.read().await;
+            let registry: tokio::sync::RwLockReadGuard<ToolRegistry> = self.registry.read().await;
             if let Some(tool) = registry.get(name) {
                 if let Some(handler) = tool.handler() {
                     return handler(args).await;
@@ -516,15 +598,28 @@ impl McpServer {
 
     /// Handle resources/list
     async fn handle_resources_list(&self) -> Result<serde_json::Value> {
+        let mut resources_list = Vec::new();
+
+        // Add dynamic status resource
+        resources_list.push(serde_json::json!({
+            "uri": format!("ghost://{}/status", self.identity.name),
+            "name": "Server Status",
+            "description": "Current server and agent status",
+            "mimeType": "application/json"
+        }));
+
+        // Add registered resources
+        let registry = self.resources.read().await;
+        for resource in registry.iter() {
+            // Check if we already added a resource with this URI (e.g. ghost://status)
+            // If so, we might want to skip or merge?
+            // For now, let's just add them.
+            // Note: ghost://status in resources.json might conflict if we want to handle it specifically.
+            resources_list.push(serde_json::to_value(resource)?);
+        }
+
         Ok(serde_json::json!({
-            "resources": [
-                {
-                    "uri": format!("ghost://{}/status", self.identity.name),
-                    "name": "Server Status",
-                    "description": "Current server and agent status",
-                    "mimeType": "application/json"
-                }
-            ]
+            "resources": resources_list
         }))
     }
 
@@ -535,7 +630,7 @@ impl McpServer {
             .and_then(|u| u.as_str())
             .ok_or_else(|| McpError::InvalidParams("Missing 'uri' parameter".to_string()))?;
 
-        if uri.ends_with("/status") {
+        if uri.ends_with("/status") || uri == "ghost://status" {
             let registry = self.registry.read().await;
             let status = serde_json::json!({
                 "server": self.identity.name,
@@ -562,7 +657,9 @@ impl McpServer {
 
     /// Handle prompts/list
     async fn handle_prompts_list(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::json!({ "prompts": [] }))
+        let registry = self.prompts.read().await;
+        let prompts: Vec<_> = registry.values().collect();
+        Ok(serde_json::json!({ "prompts": prompts }))
     }
 
     /// Handle prompts/get
@@ -571,6 +668,34 @@ impl McpServer {
             .get("name")
             .and_then(|n| n.as_str())
             .ok_or_else(|| McpError::InvalidParams("Missing 'name' parameter".to_string()))?;
+
+        // Check static registry first
+        let registry = self.prompts.read().await;
+        if let Some(prompt) = registry.get(name) {
+            return Ok(serde_json::json!({
+                "description": prompt.description,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": {
+                            "type": "text",
+                            "text": format!("Execute prompt: {}", prompt.name)
+                        }
+                    }
+                ]
+            }));
+        }
+
+        // Try custom handler
+        if let Some(ref handler) = self.prompt_handler {
+            // Pass the whole params object as args, or just arguments?
+            // MCP spec says params has "arguments" field.
+            let args = params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(serde_json::json!({}));
+            return handler.handle(name.to_string(), args).await;
+        }
 
         Err(McpError::InvalidParams(format!("Unknown prompt: {}", name)))
     }
@@ -600,7 +725,7 @@ mod tests {
         let server = McpServer::core();
         assert_eq!(server.identity().name, "ghost-core-mcp");
 
-        let registry = server.registry_read().await;
+        let registry: tokio::sync::RwLockReadGuard<ToolRegistry> = server.registry_read().await;
         assert!(registry.get("mcp_capabilities").is_some());
     }
 
@@ -842,7 +967,7 @@ mod tests {
     #[tokio::test]
     async fn test_registry_has_meta_tools() {
         let server = McpServer::core();
-        let registry = server.registry_read().await;
+        let registry: tokio::sync::RwLockReadGuard<ToolRegistry> = server.registry_read().await;
 
         assert!(registry.get("mcp_capabilities").is_some());
         assert!(registry.get("mcp_documentation").is_some());

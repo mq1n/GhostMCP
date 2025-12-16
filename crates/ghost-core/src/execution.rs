@@ -1574,6 +1574,210 @@ impl ExecutionEngine {
     // Remote Execution Methods (Cross-Process)
     // ========================================================================
 
+    /// Create a remote thread in another process to execute code at a specific address
+    ///
+    /// # Arguments
+    /// * `pid` - Target process ID (must be non-zero)
+    /// * `address` - Address to execute (must be non-zero)
+    /// * `parameter` - Optional parameter to pass
+    /// * `wait` - Whether to wait for thread completion
+    /// * `timeout_ms` - Timeout for waiting (0 = infinite)
+    ///
+    /// # Returns
+    /// `RemoteThreadResult` with thread info and execution status
+    #[cfg(target_os = "windows")]
+    pub fn create_remote_thread_at(
+        &self,
+        pid: u32,
+        address: usize,
+        parameter: Option<u64>,
+        wait: bool,
+        timeout_ms: u64,
+    ) -> Result<ghost_common::RemoteThreadResult> {
+        // Input validation
+        if pid == 0 {
+            warn!(target: "ghost_core::execution", "create_remote_thread_at called with PID 0");
+            return Err(Error::Internal("Invalid process ID: 0".into()));
+        }
+        if address == 0 {
+            warn!(target: "ghost_core::execution", "create_remote_thread_at called with null address");
+            return Err(Error::Internal("Invalid address: 0".into()));
+        }
+
+        info!(target: "ghost_core::execution",
+            pid = pid,
+            address = format!("{:#x}", address),
+            wait = wait,
+            timeout_ms = timeout_ms,
+            "Creating remote thread at address"
+        );
+
+        unsafe {
+            // Open target process
+            let process_handle = OpenProcess(PROCESS_ALL_ACCESS, false, pid).map_err(|e| {
+                error!(target: "ghost_core::execution",
+                    pid = pid,
+                    error = %e,
+                    "Failed to open process for remote thread"
+                );
+                Error::Internal(format!("OpenProcess failed for PID {}: {}", pid, e))
+            })?;
+
+            // Create remote thread
+            let param = parameter.unwrap_or(0);
+            let mut thread_id: u32 = 0;
+            let thread_handle = CreateRemoteThread(
+                process_handle,
+                None,
+                0,
+                Some(std::mem::transmute::<
+                    usize,
+                    unsafe extern "system" fn(*mut std::ffi::c_void) -> u32,
+                >(address)),
+                Some(param as *const std::ffi::c_void),
+                0,
+                Some(&mut thread_id),
+            )
+            .map_err(|e| {
+                let _ = CloseHandle(process_handle);
+                Error::Internal(format!("CreateRemoteThread failed: {}", e))
+            })?;
+
+            debug!(target: "ghost_core::execution",
+                "Remote thread {} created at {:#x} in process {}",
+                thread_id, address, pid
+            );
+
+            let mut exit_code: Option<u32> = None;
+            let mut completed = false;
+
+            if wait {
+                let wait_time = if timeout_ms == 0 {
+                    INFINITE
+                } else {
+                    timeout_ms as u32
+                };
+                let wait_result = WaitForSingleObject(thread_handle, wait_time);
+
+                // Check if completed (WAIT_OBJECT_0 = 0)
+                if wait_result.0 == 0 {
+                    completed = true;
+                    let mut code: u32 = 0;
+                    if GetExitCodeThread(thread_handle, &mut code).is_ok() {
+                        exit_code = Some(code);
+                    }
+                }
+            }
+
+            let _ = CloseHandle(thread_handle);
+            let _ = CloseHandle(process_handle);
+
+            Ok(ghost_common::RemoteThreadResult {
+                thread_id,
+                handle: 0, // Handle already closed
+                remote_address: address,
+                completed,
+                exit_code,
+                error: None,
+            })
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn create_remote_thread_at(
+        &self,
+        _pid: u32,
+        _address: usize,
+        _parameter: Option<u64>,
+        _wait: bool,
+        _timeout_ms: u64,
+    ) -> Result<ghost_common::RemoteThreadResult> {
+        Err(Error::NotImplemented(
+            "Remote thread creation only supported on Windows".into(),
+        ))
+    }
+
+    /// Queue an APC to a thread in a remote process at a specific address
+    ///
+    /// # Arguments
+    /// * `pid` - Target process ID (must be non-zero)
+    /// * `tid` - Target thread ID (must be non-zero)
+    /// * `address` - Address to execute (must be non-zero)
+    /// * `parameter` - Optional parameter to pass
+    ///
+    /// # Safety
+    /// Requires sufficient privileges.
+    #[cfg(target_os = "windows")]
+    pub fn queue_remote_apc_at(
+        &self,
+        pid: u32,
+        tid: u32,
+        address: usize,
+        parameter: Option<u64>,
+    ) -> Result<()> {
+        // Input validation
+        if pid == 0 {
+            warn!(target: "ghost_core::execution", "queue_remote_apc_at called with PID 0");
+            return Err(Error::Internal("Invalid process ID: 0".into()));
+        }
+        if tid == 0 {
+            warn!(target: "ghost_core::execution", "queue_remote_apc_at called with TID 0");
+            return Err(Error::Internal("Invalid thread ID: 0".into()));
+        }
+        if address == 0 {
+            warn!(target: "ghost_core::execution", "queue_remote_apc_at called with null address");
+            return Err(Error::Internal("Invalid address: 0".into()));
+        }
+
+        info!(target: "ghost_core::execution",
+            pid = pid,
+            tid = tid,
+            address = format!("{:#x}", address),
+            parameter = ?parameter,
+            "Queuing remote APC at address"
+        );
+
+        unsafe {
+            // Open the target thread
+            let thread_handle = OpenThread(THREAD_ALL_ACCESS, false, tid)
+                .map_err(|e| Error::Internal(format!("OpenThread failed: {}", e)))?;
+
+            // Queue the APC
+            let param = parameter.unwrap_or(0);
+            let result = QueueUserAPC(
+                Some(std::mem::transmute::<usize, unsafe extern "system" fn(usize)>(address)),
+                thread_handle,
+                param as usize,
+            );
+
+            let _ = CloseHandle(thread_handle);
+
+            if result == 0 {
+                return Err(Error::Internal("QueueUserAPC failed".into()));
+            }
+
+            debug!(target: "ghost_core::execution",
+                "Remote APC queued to thread {} at {:#x}",
+                tid, address
+            );
+
+            Ok(())
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn queue_remote_apc_at(
+        &self,
+        _pid: u32,
+        _tid: u32,
+        _address: usize,
+        _parameter: Option<u64>,
+    ) -> Result<()> {
+        Err(Error::NotImplemented(
+            "Remote APC queuing only supported on Windows".into(),
+        ))
+    }
+
     /// Create a remote thread in another process to execute code
     ///
     /// # Arguments

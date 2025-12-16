@@ -80,6 +80,15 @@ fn ghidra_functions() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "limit".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Maximum number of functions to return".to_string()),
+            default: Some(serde_json::json!(100)),
+            enum_values: None,
+        },
+    );
 
     ToolDefinition::new(
         "ghidra_functions",
@@ -105,6 +114,15 @@ fn ghidra_function() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "name".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Function name".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
 
     ToolDefinition::new(
         "ghidra_function",
@@ -114,7 +132,7 @@ fn ghidra_function() -> ToolDefinition {
     .with_schema(ToolInputSchema {
         schema_type: "object".to_string(),
         properties: props,
-        required: vec!["address".to_string()],
+        required: vec![], // address or name required, but checked in handler
         additional_properties: false,
     })
 }
@@ -179,18 +197,87 @@ fn ghidra_decompile() -> ToolDefinition {
 }
 
 fn ghidra_strings() -> ToolDefinition {
-    ToolDefinition::new("ghidra_strings", "List strings from Ghidra", "ghidra")
-        .with_schema(ToolInputSchema::empty())
+    let mut props = HashMap::new();
+    props.insert(
+        "min_length".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Minimum string length (default: 4)".to_string()),
+            default: Some(serde_json::json!(4)),
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by string content".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "limit".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Maximum number of strings to return (default: 100)".to_string()),
+            default: Some(serde_json::json!(100)),
+            enum_values: None,
+        },
+    );
+
+    ToolDefinition::new("ghidra_strings", "List strings from Ghidra", "ghidra").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
+    )
 }
 
 fn ghidra_imports() -> ToolDefinition {
-    ToolDefinition::new("ghidra_imports", "List imports from Ghidra", "ghidra")
-        .with_schema(ToolInputSchema::empty())
+    let mut props = HashMap::new();
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by import name".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+
+    ToolDefinition::new("ghidra_imports", "List imports from Ghidra", "ghidra").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
+    )
 }
 
 fn ghidra_exports() -> ToolDefinition {
-    ToolDefinition::new("ghidra_exports", "List exports from Ghidra", "ghidra")
-        .with_schema(ToolInputSchema::empty())
+    let mut props = HashMap::new();
+    props.insert(
+        "filter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Filter by export name".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+
+    ToolDefinition::new("ghidra_exports", "List exports from Ghidra", "ghidra").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
+    )
 }
 
 fn ghidra_xref() -> ToolDefinition {

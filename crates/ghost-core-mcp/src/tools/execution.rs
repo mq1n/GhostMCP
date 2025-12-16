@@ -320,6 +320,15 @@ fn cave_alloc() -> ToolDefinition {
         },
     );
     props.insert(
+        "address".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Specific address to mark as allocated (optional)".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
         "near".to_string(),
         PropertySchema {
             prop_type: "string".to_string(),
@@ -331,7 +340,7 @@ fn cave_alloc() -> ToolDefinition {
 
     ToolDefinition::new(
         "cave_alloc",
-        "Allocate a code cave near target address",
+        "Allocate a code cave (finds one if address not specified)",
         "execution",
     )
     .with_schema(ToolInputSchema {
@@ -429,10 +438,28 @@ fn syscall_invoke() -> ToolDefinition {
 fn remote_thread() -> ToolDefinition {
     let mut props = HashMap::new();
     props.insert(
+        "pid".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Target Process ID".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "shellcode".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Shellcode to inject (hex string)".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
         "address".to_string(),
         PropertySchema {
             prop_type: "string".to_string(),
-            description: Some("Start address for remote thread".to_string()),
+            description: Some("Start address (if no shellcode provided)".to_string()),
             default: None,
             enum_values: None,
         },
@@ -455,7 +482,7 @@ fn remote_thread() -> ToolDefinition {
     .with_schema(ToolInputSchema {
         schema_type: "object".to_string(),
         properties: props,
-        required: vec!["address".to_string()],
+        required: vec!["pid".to_string()],
         additional_properties: false,
     })
 }
@@ -463,7 +490,16 @@ fn remote_thread() -> ToolDefinition {
 fn remote_apc() -> ToolDefinition {
     let mut props = HashMap::new();
     props.insert(
-        "thread_id".to_string(),
+        "pid".to_string(),
+        PropertySchema {
+            prop_type: "integer".to_string(),
+            description: Some("Target Process ID".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "tid".to_string(),
         PropertySchema {
             prop_type: "integer".to_string(),
             description: Some("Thread ID to queue APC to".to_string()),
@@ -472,10 +508,28 @@ fn remote_apc() -> ToolDefinition {
         },
     );
     props.insert(
+        "shellcode".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Shellcode to inject (hex string)".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
         "address".to_string(),
         PropertySchema {
             prop_type: "string".to_string(),
-            description: Some("APC function address".to_string()),
+            description: Some("APC function address (if no shellcode provided)".to_string()),
+            default: None,
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "parameter".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Parameter to pass (optional)".to_string()),
             default: None,
             enum_values: None,
         },
@@ -489,7 +543,7 @@ fn remote_apc() -> ToolDefinition {
     .with_schema(ToolInputSchema {
         schema_type: "object".to_string(),
         properties: props,
-        required: vec!["thread_id".to_string(), "address".to_string()],
+        required: vec!["pid".to_string(), "tid".to_string()],
         additional_properties: false,
     })
 }

@@ -123,18 +123,30 @@ fn decompile() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "style".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some(
+                "Output style: 'c', 'simplified', or 'verbose' (default: 'c')".to_string(),
+            ),
+            default: Some(serde_json::json!("c")),
+            enum_values: Some(vec![
+                serde_json::json!("c"),
+                serde_json::json!("simplified"),
+                serde_json::json!("verbose"),
+            ]),
+        },
+    );
 
-    ToolDefinition::new(
-        "decompile",
-        "Decompile a function to pseudo-C (requires external backend)",
-        "disasm",
+    ToolDefinition::new("decompile", "Decompile a function to pseudo-C", "disasm").with_schema(
+        ToolInputSchema {
+            schema_type: "object".to_string(),
+            properties: props,
+            required: vec![],
+            additional_properties: false,
+        },
     )
-    .with_schema(ToolInputSchema {
-        schema_type: "object".to_string(),
-        properties: props,
-        required: vec![],
-        additional_properties: false,
-    })
 }
 
 fn assemble() -> ToolDefinition {

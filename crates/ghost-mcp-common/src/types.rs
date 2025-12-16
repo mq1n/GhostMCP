@@ -25,6 +25,44 @@ pub struct ToolParameter {
     pub enum_values: Option<Vec<String>>,
 }
 
+/// Resource definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Resource {
+    /// Resource URI
+    pub uri: String,
+    /// Resource name
+    pub name: String,
+    /// Resource description
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// MIME type
+    #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+}
+
+/// Prompt argument definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptArgument {
+    /// Argument name
+    pub name: String,
+    /// Argument description
+    pub description: String,
+    /// Whether argument is required
+    pub required: bool,
+}
+
+/// Prompt definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Prompt {
+    /// Prompt name
+    pub name: String,
+    /// Prompt description
+    pub description: String,
+    /// Prompt arguments
+    #[serde(default)]
+    pub arguments: Vec<PromptArgument>,
+}
+
 /// Tool example for documentation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolExample {

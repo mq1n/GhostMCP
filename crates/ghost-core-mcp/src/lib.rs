@@ -19,9 +19,9 @@
 pub mod handlers;
 pub mod tools;
 
-use crate::handlers::{ActionCache, ActionResult, DecompileHandler, DisasmHandler};
+use crate::handlers::{ActionCache, ActionResult, CommandHandler, DecompileHandler, DisasmHandler};
 use ghost_mcp_common::ipc::SharedAgentClient;
-use ghost_mcp_common::server::ToolHandlerFn;
+use ghost_mcp_common::server::{PromptHandlerFn, ToolHandlerFn};
 use ghost_mcp_common::{
     error::{McpError, Result},
     McpServer, ServerConfig, ServerIdentity, ToolRegistry,
@@ -31,6 +31,11 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
+
+/// Tool documentation loaded from data/tool_docs.json
+pub static TOOL_DOCS_JSON: &str = include_str!("../../../data/tool_docs.json");
+/// MCP prompts loaded from data/prompts.json
+pub static PROMPTS_JSON: &str = include_str!("../../../data/prompts.json");
 
 /// Expected tool count for ghost-core-mcp (85 tools)
 pub const EXPECTED_TOOL_COUNT: usize = 85;
@@ -121,18 +126,10 @@ pub fn create_server() -> Result<McpServer> {
     Ok(server)
 }
 
-/// Core tool handler with local tool support and action caching
-#[derive(Clone)]
+/// Core tool handler that implements caching and specific tool logic
+#[derive(Clone, Default)]
 struct CoreToolHandler {
     action_cache: Arc<ActionCache>,
-}
-
-impl Default for CoreToolHandler {
-    fn default() -> Self {
-        Self {
-            action_cache: Arc::new(ActionCache::new()),
-        }
-    }
 }
 
 impl ToolHandlerFn for CoreToolHandler {
@@ -141,7 +138,7 @@ impl ToolHandlerFn for CoreToolHandler {
         name: String,
         args: serde_json::Value,
         agent: SharedAgentClient,
-    ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value>> + Send>> {
+    ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value>> + Send + '_>> {
         let cache = self.action_cache.clone();
 
         Box::pin(async move {
@@ -165,7 +162,85 @@ impl ToolHandlerFn for CoreToolHandler {
                     .map_err(McpError::Handler),
                 "decompile" => DecompileHandler::handle_decompile(&agent, &args)
                     .await
-                    .map_err(McpError::Handler),
+                    .map_err(|e| McpError::Handler(e.to_string())),
+
+                // Local tools: session info
+                "session_info" => {
+                    // Check connection status first
+                    if !agent.is_connected() {
+                        let _ = agent.connect().await;
+                    }
+
+                    if let Some(s) = agent.status().await {
+                        // Agent connected, try to get full session info from agent
+                        match agent.request_with_reconnect(&name, args.clone()).await {
+                            Ok(res) => Ok(serde_json::json!({
+                                "content": [{ "type": "text", "text": res.to_string() }]
+                            })),
+                            Err(e) => {
+                                // Fallback to basic status if tool call fails but we have status
+                                debug!(target: "ghost_core_mcp", error = %e, "Session info tool call failed, using cached status");
+                                let started_at = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map(|d| d.as_secs())
+                                    .unwrap_or(0);
+                                let session = serde_json::json!({
+                                    "session_id": format!("ghost-{}", s.pid),
+                                    "attached": true,
+                                    "pid": s.pid,
+                                    "process_name": s.process_name,
+                                    "arch": s.arch,
+                                    "agent_version": s.version,
+                                    "started_at": started_at,
+                                    "message": "Basic session info (agent tool call failed)"
+                                });
+                                let text =
+                                    serde_json::to_string_pretty(&session).unwrap_or_default();
+                                Ok(serde_json::json!({
+                                    "content": [{ "type": "text", "text": text }]
+                                }))
+                            }
+                        }
+                    } else {
+                        // Agent not connected - legacy behavior
+                        debug!(target: "ghost_core_mcp", "Session info: not attached");
+                        let session = serde_json::json!({
+                            "session_id": null,
+                            "attached": false,
+                            "pid": null,
+                            "process_name": null,
+                            "arch": null,
+                            "message": "No process attached. Use session_attach or process_spawn to attach."
+                        });
+                        let text = serde_json::to_string_pretty(&session).unwrap_or_default();
+                        Ok(serde_json::json!({
+                            "content": [{ "type": "text", "text": text }]
+                        }))
+                    }
+                }
+
+                // Command tools
+                "command_batch" => {
+                    let agent_clone = agent.clone();
+                    let handler_clone = self.clone();
+                    CommandHandler::handle_command_batch(&args, move |t, a| {
+                        let ac = agent_clone.clone();
+                        let hc = handler_clone.clone();
+                        async move { hc.handle(t, a, ac).await }
+                    })
+                    .await
+                }
+                "command_history" => CommandHandler::handle_command_history(&cache, &args).await,
+                "command_replay" => {
+                    let agent_clone = agent.clone();
+                    let handler_clone = self.clone();
+                    CommandHandler::handle_command_replay(&cache, &args, move |t, a| {
+                        let ac = agent_clone.clone();
+                        let hc = handler_clone.clone();
+                        async move { hc.handle(t, a, ac).await }
+                    })
+                    .await
+                }
 
                 // Agent-forwarded tools (everything else)
                 _ => {
@@ -220,13 +295,52 @@ impl ToolHandlerFn for CoreToolHandler {
     }
 }
 
+/// Core prompt handler
+#[derive(Clone, Default)]
+struct CorePromptHandler;
+
+impl PromptHandlerFn for CorePromptHandler {
+    fn handle(
+        &self,
+        name: String,
+        args: serde_json::Value,
+    ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value>> + Send>> {
+        Box::pin(async move {
+            match name.as_str() {
+                "analyze_function" => {
+                    let address = args
+                        .get("address")
+                        .and_then(|a| a.as_str())
+                        .unwrap_or("unknown");
+
+                    Ok(serde_json::json!({
+                        "description": "Analyze a function",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": {
+                                    "type": "text",
+                                    "text": format!("Please analyze the function at address {}. First, use `disasm_function` to get the instructions. Then, look for interesting patterns, calls to imported functions, and control flow. finally, summarize what the function appears to be doing.", address)
+                                }
+                            }
+                        ]
+                    }))
+                }
+                _ => Err(McpError::PromptNotFound(name)),
+            }
+        })
+    }
+}
+
 /// Create server with tools registered
 ///
 /// # Errors
 /// Returns an error if server creation or tool registration fails.
 pub async fn create_server_with_tools() -> Result<McpServer> {
     debug!(target: "ghost_core_mcp", "Creating server with tools");
-    let server = create_server()?.with_tool_handler(CoreToolHandler::default());
+    let server = create_server()?
+        .with_tool_handler(CoreToolHandler::default())
+        .with_prompt_handler(CorePromptHandler);
 
     // Get tool definitions from our registry (excluding shared meta which McpServer adds)
     let tool_registry = create_registry()?;
@@ -248,6 +362,8 @@ pub async fn create_server_with_tools() -> Result<McpServer> {
                 skipped += 1;
             }
         }
+        // Enrich tools with documentation
+        registry.enrich_with_docs(ghost_mcp_common::data::get_tool_docs());
     }
 
     info!(
@@ -345,5 +461,23 @@ mod tests {
         let server = create_server().unwrap();
         assert_eq!(server.identity().name, "ghost-core-mcp");
         assert_eq!(server.identity().port, PORT);
+    }
+
+    #[tokio::test]
+    async fn test_core_prompt_handler() {
+        let handler = CorePromptHandler;
+        let args = serde_json::json!({
+            "address": "0x1234"
+        });
+
+        let result = handler
+            .handle("analyze_function".to_string(), args)
+            .await
+            .unwrap();
+
+        let messages = result["messages"].as_array().unwrap();
+        let text = messages[0]["content"]["text"].as_str().unwrap();
+        assert!(text.contains("0x1234"));
+        assert!(text.contains("disasm_function"));
     }
 }

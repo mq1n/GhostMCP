@@ -415,6 +415,15 @@ impl ToolRegistry {
             cats.join(", ")
         )
     }
+
+    /// Enrich registered tools with documentation
+    pub fn enrich_with_docs(&mut self, docs: &HashMap<String, ToolDocumentation>) {
+        for (name, tool_doc) in docs {
+            if let Some(tool) = self.tools.get_mut(name) {
+                tool.documentation = Some(tool_doc.clone());
+            }
+        }
+    }
 }
 
 /// Compile-time tool count validation macro

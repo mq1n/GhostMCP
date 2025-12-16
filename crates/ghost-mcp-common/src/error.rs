@@ -26,6 +26,10 @@ pub enum McpError {
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
 
+    /// Prompt not found
+    #[error("Prompt not found: {0}")]
+    PromptNotFound(String),
+
     /// IPC connection error
     #[error("IPC connection error: {0}")]
     Connection(String),
@@ -76,7 +80,7 @@ impl McpError {
     pub fn to_jsonrpc_code(&self) -> i32 {
         match self {
             McpError::InvalidParams(_) => -32602,
-            McpError::ToolNotFound(_) => -32601,
+            McpError::ToolNotFound(_) | McpError::PromptNotFound(_) => -32601,
             McpError::Protocol(_) | McpError::Serialization(_) => -32700,
             McpError::AgentNotConnected | McpError::Connection(_) => -32003,
             McpError::Timeout(_) => -32004,

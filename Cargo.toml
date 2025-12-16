@@ -116,6 +116,10 @@ ida = ["ghost-static-mcp/ida", "ghost-re-backends/ida"]
 name = "integration"
 path = "tests/integration.rs"
 
+[[test]]
+name = "tool_count_golden"
+path = "tests/tool_count_golden.rs"
+
 [profile.release]
 opt-level = "z"
 lto = true

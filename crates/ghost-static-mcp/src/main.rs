@@ -6,7 +6,7 @@
 use clap::Parser;
 use ghost_mcp_common::{error::Result, Transport};
 use ghost_static_mcp::{create_server_with_tools, validate_registry, PORT};
-use tracing::info;
+use tracing::{error, info};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[derive(Parser, Debug)]
@@ -52,6 +52,15 @@ async fn main() -> Result<()> {
             .with(fmt::layer().with_target(true).with_level(true))
             .with(EnvFilter::from_default_env().add_directive("ghost_mcp=info".parse().unwrap()))
             .init();
+    }
+
+    // Validate embedded JSON data at startup (fail fast)
+    if let Err(e) = ghost_mcp_common::data::validate_embedded_json() {
+        error!("Embedded JSON validation failed: {}", e);
+        return Err(ghost_mcp_common::McpError::Internal(format!(
+            "JSON data validation failed: {}",
+            e
+        )));
     }
 
     if args.validate_registry {

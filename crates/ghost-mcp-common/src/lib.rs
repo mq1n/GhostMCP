@@ -9,6 +9,7 @@
 //! - Common types and handler utilities
 
 pub mod config;
+pub mod data;
 pub mod error;
 pub mod ipc;
 pub mod meta;
