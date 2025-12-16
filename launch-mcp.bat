@@ -9,6 +9,7 @@ REM   launch-mcp.bat -AnalysisOnly      - Launch only ghost-analysis-mcp
 REM   launch-mcp.bat -StaticOnly        - Launch only ghost-static-mcp
 REM   launch-mcp.bat -ExtendedOnly      - Launch only ghost-extended-mcp
 REM   launch-mcp.bat -ValidateOnly      - Validate tool registries only
+REM   launch-mcp.bat -ShowOutput        - Show MCP server windows (verbose logging)
 REM
 REM Servers:
 REM   ghost-core-mcp     (port 13340, 85 tools)  - Memory, Debug, Execution, Safety

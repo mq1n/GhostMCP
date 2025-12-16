@@ -228,7 +228,8 @@ foreach ($server in $servers) {
     } else {
         Write-Host "  Launching $($server.Name) on stdio (target $($server.ToolTarget) tools)..." -ForegroundColor Cyan
     }
-    $proc = Start-Process -FilePath $server.Exe -ArgumentList $args -PassThru -WindowStyle Hidden -WorkingDirectory $ReleasePath
+    $windowStyle = if ($ShowOutput) { "Normal" } else { "Hidden" }
+    $proc = Start-Process -FilePath $server.Exe -ArgumentList $args -PassThru -WindowStyle $windowStyle -WorkingDirectory $ReleasePath
     if ($proc) {
         $serverProcs += $proc
         Write-Host "    [OK] PID $($proc.Id)" -ForegroundColor Green

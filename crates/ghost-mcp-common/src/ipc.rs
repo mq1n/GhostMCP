@@ -402,12 +402,20 @@ impl AgentClient {
             return Err(McpError::Protocol("Request too large".to_string()));
         }
 
-        // Get stream
+        // Get stream with timeout on mutex acquisition to prevent indefinite blocking
         let stream_arc = {
             let guard = self.stream.read().await;
             guard.as_ref().cloned().ok_or(McpError::AgentNotConnected)?
         };
-        let mut stream = stream_arc.lock_owned().await;
+        
+        // Timeout on mutex acquisition - prevents hanging if another request holds the lock
+        let lock_timeout = Duration::from_millis(self.config.timeout_ms);
+        let mut stream = timeout(lock_timeout, stream_arc.lock_owned())
+            .await
+            .map_err(|_| {
+                warn!(target: "ghost_mcp::ipc", "Timeout waiting for stream lock");
+                McpError::Timeout(self.config.timeout_ms)
+            })?;
 
         // Write with timeout
         let write_future = async {
@@ -562,12 +570,10 @@ impl AgentClient {
         let interval = Duration::from_millis(self.config.heartbeat.interval_ms);
         let heartbeat_timeout = Duration::from_millis(self.config.heartbeat.timeout_ms);
         let max_failures = self.config.heartbeat.max_failures;
-        let retry_config = self.config.retry.clone();
         let client = self.clone();
 
         let handle = tokio::spawn(async move {
             let mut failures: u32 = 0;
-            let mut backoff_ms = retry_config.initial_backoff_ms;
 
             loop {
                 tokio::time::sleep(interval).await;
@@ -579,7 +585,6 @@ impl AgentClient {
                 match ping {
                     Ok(Ok(_)) => {
                         failures = 0;
-                        backoff_ms = retry_config.initial_backoff_ms;
                         let mut h = client.health.write().await;
                         h.state = ConnectionState::Connected;
                         h.last_ping = Some(Instant::now());
@@ -610,40 +615,13 @@ impl AgentClient {
 
                         if failures >= max_failures {
                             client.connected.store(false, Ordering::SeqCst);
-
-                            // Attempt reconnect with backoff
-                            loop {
-                                warn!(
-                                    target: "ghost_mcp::ipc",
-                                    backoff_ms = backoff_ms,
-                                    "Attempting reconnect after heartbeat failure"
-                                );
-
-                                match client.connect_with_retry(&retry_config).await {
-                                    Ok(_) => {
-                                        let mut h = client.health.write().await;
-                                        h.state = ConnectionState::Connected;
-                                        h.last_ping = Some(Instant::now());
-                                        h.failures = 0;
-                                        h.last_error = None;
-                                        failures = 0;
-                                        backoff_ms = retry_config.initial_backoff_ms;
-                                        break;
-                                    }
-                                    Err(err) => {
-                                        {
-                                            let mut h = client.health.write().await;
-                                            h.state = ConnectionState::Disconnected;
-                                            h.last_error = Some(err.to_string());
-                                        }
-                                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                                        backoff_ms = ((backoff_ms as f64)
-                                            * retry_config.backoff_multiplier)
-                                            as u64;
-                                        backoff_ms = backoff_ms.min(retry_config.max_backoff_ms);
-                                    }
-                                }
-                            }
+                            // Don't reconnect from heartbeat - let request_with_reconnect handle it
+                            // This prevents conflicts between concurrent reconnection attempts
+                            error!(
+                                target: "ghost_mcp::ipc",
+                                "Connection marked as disconnected after {} heartbeat failures",
+                                failures
+                            );
                         }
                     }
                     Err(_) => {
@@ -669,52 +647,32 @@ impl AgentClient {
 
                         if failures >= max_failures {
                             client.connected.store(false, Ordering::SeqCst);
-
-                            // Attempt reconnect with backoff
-                            loop {
-                                warn!(
-                                    target: "ghost_mcp::ipc",
-                                    backoff_ms = backoff_ms,
-                                    "Attempting reconnect after heartbeat failure"
-                                );
-
-                                match client.connect_with_retry(&retry_config).await {
-                                    Ok(_) => {
-                                        let mut h = client.health.write().await;
-                                        h.state = ConnectionState::Connected;
-                                        h.last_ping = Some(Instant::now());
-                                        h.failures = 0;
-                                        h.last_error = None;
-                                        failures = 0;
-                                        backoff_ms = retry_config.initial_backoff_ms;
-                                        break;
-                                    }
-                                    Err(err) => {
-                                        {
-                                            let mut h = client.health.write().await;
-                                            h.state = ConnectionState::Disconnected;
-                                            h.last_error = Some(err.to_string());
-                                        }
-                                        tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
-                                        backoff_ms = ((backoff_ms as f64)
-                                            * retry_config.backoff_multiplier)
-                                            as u64;
-                                        backoff_ms = backoff_ms.min(retry_config.max_backoff_ms);
-                                    }
-                                }
-                            }
+                            // Don't reconnect from heartbeat - let request_with_reconnect handle it
+                            // This prevents conflicts between concurrent reconnection attempts
+                            error!(
+                                target: "ghost_mcp::ipc",
+                                "Connection marked as disconnected after {} heartbeat timeouts",
+                                failures
+                            );
                         }
                     }
                 }
             }
         });
 
-        // Store handle synchronously using try_lock
-        if let Ok(mut handle_guard) = self.heartbeat_handle.try_lock() {
-            if let Some(old_handle) = handle_guard.take() {
-                old_handle.abort();
+        // Store handle using try_lock - if it fails, abort the new task to prevent orphaned heartbeat
+        match self.heartbeat_handle.try_lock() {
+            Ok(mut handle_guard) => {
+                if let Some(old_handle) = handle_guard.take() {
+                    old_handle.abort();
+                }
+                *handle_guard = Some(handle);
             }
-            *handle_guard = Some(handle);
+            Err(_) => {
+                // Lock held - abort new task to prevent orphaned heartbeat
+                warn!(target: "ghost_mcp::ipc", "Could not store heartbeat handle (lock held), aborting new task");
+                handle.abort();
+            }
         }
     }
 
