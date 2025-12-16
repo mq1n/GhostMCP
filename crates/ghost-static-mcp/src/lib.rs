@@ -430,7 +430,7 @@ impl ToolHandlerFn for StaticToolHandler {
             } else if let Some(reason) = StaticToolHandler::unsupported_reason(&name) {
                 Err(McpError::Handler(reason.to_string()))
             } else {
-                // All other tools (trace, ai, yara) - forward to agent
+                // All other tools - forward to agent
                 if !agent.is_connected() {
                     let _ = agent.connect().await;
                 }
@@ -440,7 +440,10 @@ impl ToolHandlerFn for StaticToolHandler {
                     .await
                     .map_err(|e| McpError::Handler(e.to_string()))?;
 
-                Ok(response)
+                // Format response for MCP
+                Ok(serde_json::json!({
+                    "content": [{ "type": "text", "text": response.to_string() }]
+                }))
             };
 
             let duration_ms = start_time.elapsed().as_millis();

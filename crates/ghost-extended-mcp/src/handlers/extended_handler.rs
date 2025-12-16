@@ -114,7 +114,11 @@ impl ExtendedHandler {
             })?;
 
         trace!(target: "ghost_extended_mcp", tool = %name, "Agent response received");
-        Ok(response)
+
+        // Format response for MCP
+        Ok(serde_json::json!({
+            "content": [{ "type": "text", "text": response.to_string() }]
+        }))
     }
 
     /// Check if a tool is an extended capability tool
