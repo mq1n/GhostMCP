@@ -44,6 +44,7 @@ fn exec_resolve() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -69,6 +70,7 @@ fn exec_call() -> ToolDefinition {
             description: Some("Function address to call (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -78,6 +80,7 @@ fn exec_call() -> ToolDefinition {
             description: Some("Arguments to pass (as hex strings or integers)".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -91,6 +94,7 @@ fn exec_call() -> ToolDefinition {
                 serde_json::json!("stdcall"),
                 serde_json::json!("cdecl"),
             ]),
+            items: None,
         },
     );
 
@@ -116,6 +120,7 @@ fn exec_call_api() -> ToolDefinition {
             description: Some("API name (e.g., 'kernel32!MessageBoxW')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -125,6 +130,7 @@ fn exec_call_api() -> ToolDefinition {
             description: Some("Arguments to pass".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -150,6 +156,7 @@ fn exec_shellcode() -> ToolDefinition {
             description: Some("Shellcode bytes as hex string".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -161,6 +168,7 @@ fn exec_shellcode() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -186,6 +194,7 @@ fn exec_alloc() -> ToolDefinition {
             description: Some("Size in bytes to allocate".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -199,6 +208,7 @@ fn exec_alloc() -> ToolDefinition {
                 serde_json::json!("rx"),
                 serde_json::json!("rwx"),
             ]),
+            items: None,
         },
     );
 
@@ -224,6 +234,7 @@ fn exec_free() -> ToolDefinition {
             description: Some("Address to free (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -249,6 +260,7 @@ fn exec_write() -> ToolDefinition {
             description: Some("Address to write to (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -258,6 +270,7 @@ fn exec_write() -> ToolDefinition {
             description: Some("Data to write (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -283,6 +296,7 @@ fn cave_find() -> ToolDefinition {
             description: Some("Minimum size of code cave needed".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -292,6 +306,7 @@ fn cave_find() -> ToolDefinition {
             description: Some("Module to search in (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -317,6 +332,7 @@ fn cave_alloc() -> ToolDefinition {
             description: Some("Size of code cave to allocate".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -326,6 +342,7 @@ fn cave_alloc() -> ToolDefinition {
             description: Some("Specific address to mark as allocated (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -335,6 +352,7 @@ fn cave_alloc() -> ToolDefinition {
             description: Some("Allocate near this address (for short jumps)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -360,6 +378,7 @@ fn cave_free() -> ToolDefinition {
             description: Some("Code cave address to free".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -385,6 +404,7 @@ fn syscall_number() -> ToolDefinition {
             description: Some("Syscall name (e.g., 'NtReadVirtualMemory')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -410,6 +430,7 @@ fn syscall_invoke() -> ToolDefinition {
             description: Some("Syscall number".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -419,6 +440,7 @@ fn syscall_invoke() -> ToolDefinition {
             description: Some("Syscall arguments".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -444,6 +466,7 @@ fn remote_thread() -> ToolDefinition {
             description: Some("Target Process ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -453,6 +476,7 @@ fn remote_thread() -> ToolDefinition {
             description: Some("Shellcode to inject (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -462,6 +486,7 @@ fn remote_thread() -> ToolDefinition {
             description: Some("Start address (if no shellcode provided)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -471,6 +496,7 @@ fn remote_thread() -> ToolDefinition {
             description: Some("Parameter to pass (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -496,6 +522,7 @@ fn remote_apc() -> ToolDefinition {
             description: Some("Target Process ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -505,6 +532,7 @@ fn remote_apc() -> ToolDefinition {
             description: Some("Thread ID to queue APC to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -514,6 +542,7 @@ fn remote_apc() -> ToolDefinition {
             description: Some("Shellcode to inject (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -523,6 +552,7 @@ fn remote_apc() -> ToolDefinition {
             description: Some("APC function address (if no shellcode provided)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -532,6 +562,7 @@ fn remote_apc() -> ToolDefinition {
             description: Some("Parameter to pass (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

@@ -46,6 +46,7 @@ fn thread_registers() -> ToolDefinition {
             description: Some("Thread ID to get registers for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -71,6 +72,7 @@ fn thread_suspend() -> ToolDefinition {
             description: Some("Thread ID to suspend".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -96,6 +98,7 @@ fn thread_resume() -> ToolDefinition {
             description: Some("Thread ID to resume".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -121,6 +124,7 @@ fn breakpoint_set() -> ToolDefinition {
             description: Some("Address to set breakpoint at (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -133,6 +137,7 @@ fn breakpoint_set() -> ToolDefinition {
                 serde_json::json!("software"),
                 serde_json::json!("hardware"),
             ]),
+            items: None,
         },
     );
     props.insert(
@@ -142,6 +147,7 @@ fn breakpoint_set() -> ToolDefinition {
             description: Some("Conditional expression (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -167,6 +173,7 @@ fn breakpoint_remove() -> ToolDefinition {
             description: Some("Breakpoint ID to remove".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -197,6 +204,7 @@ fn breakpoint_enable() -> ToolDefinition {
             description: Some("Breakpoint ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -206,6 +214,7 @@ fn breakpoint_enable() -> ToolDefinition {
             description: Some("Enable (true) or disable (false)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -240,6 +249,7 @@ fn execution_step_into() -> ToolDefinition {
             description: Some("Thread ID to step (optional, uses current)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -265,6 +275,7 @@ fn stack_walk() -> ToolDefinition {
             description: Some("Thread ID to walk stack for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -274,6 +285,7 @@ fn stack_walk() -> ToolDefinition {
             description: Some("Maximum frames to return (default: 50)".to_string()),
             default: Some(serde_json::json!(50)),
             enum_values: None,
+            items: None,
         },
     );
 

@@ -40,6 +40,7 @@ fn r2_session() -> ToolDefinition {
             description: Some("Session action".to_string()),
             default: None,
             enum_values: Some(vec![serde_json::json!("open"), serde_json::json!("close")]),
+            items: None,
         },
     );
     props.insert(
@@ -49,6 +50,7 @@ fn r2_session() -> ToolDefinition {
             description: Some("Binary file path (required for open)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -85,6 +87,7 @@ fn r2_functions() -> ToolDefinition {
             description: Some("Filter by function name pattern".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -94,6 +97,7 @@ fn r2_functions() -> ToolDefinition {
             description: Some("Maximum number of functions to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -116,6 +120,7 @@ fn r2_function() -> ToolDefinition {
             description: Some("Function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -125,6 +130,7 @@ fn r2_function() -> ToolDefinition {
             description: Some("Function address (alternative to name)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -147,6 +153,7 @@ fn r2_disasm() -> ToolDefinition {
             description: Some("Address to disassemble".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -156,6 +163,7 @@ fn r2_disasm() -> ToolDefinition {
             description: Some("Number of instructions (default: 20)".to_string()),
             default: Some(serde_json::json!(20)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -178,6 +186,7 @@ fn r2_disasm_function() -> ToolDefinition {
             description: Some("Function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -203,6 +212,7 @@ fn r2_decompile() -> ToolDefinition {
             description: Some("Function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -228,6 +238,7 @@ fn r2_strings() -> ToolDefinition {
             description: Some("Minimum string length (default: 4)".to_string()),
             default: Some(serde_json::json!(4)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -237,6 +248,7 @@ fn r2_strings() -> ToolDefinition {
             description: Some("Filter by string content".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -246,6 +258,7 @@ fn r2_strings() -> ToolDefinition {
             description: Some("Maximum number of strings to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -268,6 +281,7 @@ fn r2_imports() -> ToolDefinition {
             description: Some("Filter by import name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -290,6 +304,7 @@ fn r2_exports() -> ToolDefinition {
             description: Some("Filter by export name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -312,6 +327,7 @@ fn r2_xref() -> ToolDefinition {
             description: Some("Address to get xrefs for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -321,6 +337,7 @@ fn r2_xref() -> ToolDefinition {
             description: Some("Xref direction".to_string()),
             default: Some(serde_json::json!("to")),
             enum_values: Some(vec![serde_json::json!("to"), serde_json::json!("from")]),
+            items: None,
         },
     );
 
@@ -343,6 +360,7 @@ fn r2_read() -> ToolDefinition {
             description: Some("Address to read from".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -352,6 +370,7 @@ fn r2_read() -> ToolDefinition {
             description: Some("Bytes to read (default: 256)".to_string()),
             default: Some(serde_json::json!(256)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -374,6 +393,7 @@ fn r2_cmd() -> ToolDefinition {
             description: Some("Radare2 command to execute".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

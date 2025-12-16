@@ -39,6 +39,7 @@ fn dump_create() -> ToolDefinition {
             description: Some("Dump name (optional, auto-generated)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -52,6 +53,7 @@ fn dump_create() -> ToolDefinition {
                 serde_json::json!("heap"),
                 serde_json::json!("stack"),
             ]),
+            items: None,
         },
     );
 
@@ -74,6 +76,7 @@ fn dump_region() -> ToolDefinition {
             description: Some("Start address".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -83,6 +86,7 @@ fn dump_region() -> ToolDefinition {
             description: Some("Size in bytes".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -92,6 +96,7 @@ fn dump_region() -> ToolDefinition {
             description: Some("Output file path (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -114,6 +119,7 @@ fn dump_module() -> ToolDefinition {
             description: Some("Module name to dump".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -123,6 +129,7 @@ fn dump_module() -> ToolDefinition {
             description: Some("Output file path (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -145,6 +152,7 @@ fn dump_minidump() -> ToolDefinition {
             description: Some("Output file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -158,6 +166,7 @@ fn dump_minidump() -> ToolDefinition {
                 serde_json::json!("with_data"),
                 serde_json::json!("full"),
             ]),
+            items: None,
         },
     );
 
@@ -185,6 +194,7 @@ fn dump_info() -> ToolDefinition {
             description: Some("Dump ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -207,6 +217,7 @@ fn dump_compare() -> ToolDefinition {
             description: Some("First dump ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -216,6 +227,7 @@ fn dump_compare() -> ToolDefinition {
             description: Some("Second dump ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -238,6 +250,7 @@ fn dump_search() -> ToolDefinition {
             description: Some("Dump ID to search".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -247,6 +260,7 @@ fn dump_search() -> ToolDefinition {
             description: Some("Pattern to search for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -269,6 +283,7 @@ fn dump_annotate() -> ToolDefinition {
             description: Some("Dump ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -278,6 +293,7 @@ fn dump_annotate() -> ToolDefinition {
             description: Some("Address to annotate".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -287,6 +303,7 @@ fn dump_annotate() -> ToolDefinition {
             description: Some("Annotation text".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -313,6 +330,7 @@ fn dump_incremental() -> ToolDefinition {
             description: Some("Base dump ID to compare against".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -338,6 +356,7 @@ fn dump_delete() -> ToolDefinition {
             description: Some("Dump ID to delete".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -358,6 +377,7 @@ fn pe_reconstruct() -> ToolDefinition {
             description: Some("Module to reconstruct".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -367,6 +387,7 @@ fn pe_reconstruct() -> ToolDefinition {
             description: Some("Output file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -376,6 +397,7 @@ fn pe_reconstruct() -> ToolDefinition {
             description: Some("Attempt to fix IAT (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -398,6 +420,7 @@ fn pe_validate() -> ToolDefinition {
             description: Some("PE file path to validate".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

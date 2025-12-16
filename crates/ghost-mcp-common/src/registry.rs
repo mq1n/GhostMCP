@@ -85,6 +85,9 @@ pub struct PropertySchema {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "enum")]
     pub enum_values: Option<Vec<serde_json::Value>>,
+    /// Items schema for array type
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub items: Option<Box<PropertySchema>>,
 }
 
 impl PropertySchema {
@@ -95,6 +98,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
         }
     }
 
@@ -105,6 +109,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
         }
     }
 
@@ -115,6 +120,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
         }
     }
 
@@ -125,6 +131,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
         }
     }
 
@@ -135,6 +142,18 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
+        }
+    }
+
+    /// Create an array property with items schema
+    pub fn array_with_items(description: &str, items: PropertySchema) -> Self {
+        Self {
+            prop_type: "array".to_string(),
+            description: Some(description.to_string()),
+            default: None,
+            enum_values: None,
+            items: Some(Box::new(items)),
         }
     }
 
@@ -145,6 +164,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: None,
+            items: None,
         }
     }
 
@@ -155,6 +175,7 @@ impl PropertySchema {
             description: Some(description.to_string()),
             default: None,
             enum_values: Some(values.into_iter().map(|v| serde_json::json!(v)).collect()),
+            items: None,
         }
     }
 
@@ -194,6 +215,7 @@ impl ToolInputSchema {
                     enum_values: param
                         .enum_values
                         .map(|v| v.into_iter().map(serde_json::Value::String).collect()),
+                    items: None,
                 },
             );
         }

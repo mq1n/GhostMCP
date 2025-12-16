@@ -32,6 +32,7 @@ fn command_batch() -> ToolDefinition {
             description: Some("Array of commands to execute in sequence".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -41,6 +42,7 @@ fn command_batch() -> ToolDefinition {
             description: Some("Stop batch execution on first error (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -66,6 +68,7 @@ fn command_history() -> ToolDefinition {
             description: Some("Maximum entries to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -75,6 +78,7 @@ fn command_history() -> ToolDefinition {
             description: Some("Filter by command name pattern (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -100,6 +104,7 @@ fn command_replay() -> ToolDefinition {
             description: Some("History entry ID to replay".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -122,6 +127,7 @@ fn event_subscribe() -> ToolDefinition {
             description: Some("Event types to subscribe to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -147,6 +153,7 @@ fn event_unsubscribe() -> ToolDefinition {
             description: Some("Event types to unsubscribe from (empty = all)".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -172,6 +179,7 @@ fn event_poll() -> ToolDefinition {
             description: Some("Timeout in milliseconds (default: 1000)".to_string()),
             default: Some(serde_json::json!(1000)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -181,6 +189,7 @@ fn event_poll() -> ToolDefinition {
             description: Some("Maximum events to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 

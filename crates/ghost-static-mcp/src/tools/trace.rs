@@ -48,6 +48,7 @@ fn trace_session_create() -> ToolDefinition {
             description: Some("Trace session name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -73,6 +74,7 @@ fn trace_control() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -87,6 +89,7 @@ fn trace_control() -> ToolDefinition {
                 serde_json::json!("pause"),
                 serde_json::json!("resume"),
             ]),
+            items: None,
         },
     );
 
@@ -112,6 +115,7 @@ fn trace_session_close() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -139,6 +143,7 @@ fn trace_session_info() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -161,6 +166,7 @@ fn trace_events() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -170,6 +176,7 @@ fn trace_events() -> ToolDefinition {
             description: Some("Maximum events to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -179,6 +186,7 @@ fn trace_events() -> ToolDefinition {
             description: Some("Filter events by API name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -201,6 +209,7 @@ fn trace_events_clear() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -223,6 +232,7 @@ fn trace_stats() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -250,6 +260,7 @@ fn trace_filter_set() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -259,6 +270,7 @@ fn trace_filter_set() -> ToolDefinition {
             description: Some("APIs to include (patterns)".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -268,6 +280,7 @@ fn trace_filter_set() -> ToolDefinition {
             description: Some("APIs to exclude (patterns)".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -295,6 +308,7 @@ fn trace_preset_apply() -> ToolDefinition {
             description: Some("Trace session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -304,6 +318,7 @@ fn trace_preset_apply() -> ToolDefinition {
             description: Some("Preset name (file, registry, network, crypto, etc.)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -326,6 +341,7 @@ fn trace_preset_create() -> ToolDefinition {
             description: Some("Preset name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -335,6 +351,7 @@ fn trace_preset_create() -> ToolDefinition {
             description: Some("APIs to include in preset".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -360,6 +377,7 @@ fn trace_preset_delete() -> ToolDefinition {
             description: Some("Preset name to delete".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -391,6 +409,7 @@ fn trace_pack_info() -> ToolDefinition {
             description: Some("Pack name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -413,6 +432,7 @@ fn trace_pack_load() -> ToolDefinition {
             description: Some("Pack name or path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -435,6 +455,7 @@ fn trace_pack_unload() -> ToolDefinition {
             description: Some("Pack name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

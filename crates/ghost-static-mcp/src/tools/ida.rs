@@ -36,6 +36,7 @@ fn ida_session() -> ToolDefinition {
             description: Some("Session action".to_string()),
             default: None,
             enum_values: Some(vec![serde_json::json!("open"), serde_json::json!("close")]),
+            items: None,
         },
     );
     props.insert(
@@ -45,6 +46,7 @@ fn ida_session() -> ToolDefinition {
             description: Some("Binary or IDB path (required for open)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -77,6 +79,7 @@ fn ida_functions() -> ToolDefinition {
             description: Some("Filter by function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -86,6 +89,7 @@ fn ida_functions() -> ToolDefinition {
             description: Some("Maximum number of functions to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -108,6 +112,7 @@ fn ida_function() -> ToolDefinition {
             description: Some("Function address".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -117,6 +122,7 @@ fn ida_function() -> ToolDefinition {
             description: Some("Function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -139,6 +145,7 @@ fn ida_disasm() -> ToolDefinition {
             description: Some("Address to disassemble".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -148,6 +155,7 @@ fn ida_disasm() -> ToolDefinition {
             description: Some("Number of instructions".to_string()),
             default: Some(serde_json::json!(20)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -170,6 +178,7 @@ fn ida_decompile() -> ToolDefinition {
             description: Some("Function address to decompile".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -192,6 +201,7 @@ fn ida_strings() -> ToolDefinition {
             description: Some("Minimum string length (default: 4)".to_string()),
             default: Some(serde_json::json!(4)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -201,6 +211,7 @@ fn ida_strings() -> ToolDefinition {
             description: Some("Filter by string content".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -210,6 +221,7 @@ fn ida_strings() -> ToolDefinition {
             description: Some("Maximum number of strings to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -232,6 +244,7 @@ fn ida_imports() -> ToolDefinition {
             description: Some("Filter by import name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -254,6 +267,7 @@ fn ida_exports() -> ToolDefinition {
             description: Some("Filter by export name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -276,6 +290,7 @@ fn ida_xref() -> ToolDefinition {
             description: Some("Address to get xrefs for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -285,6 +300,7 @@ fn ida_xref() -> ToolDefinition {
             description: Some("Xref direction".to_string()),
             default: Some(serde_json::json!("to")),
             enum_values: Some(vec![serde_json::json!("to"), serde_json::json!("from")]),
+            items: None,
         },
     );
 

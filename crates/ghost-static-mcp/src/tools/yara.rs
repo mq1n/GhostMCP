@@ -40,6 +40,7 @@ fn yara_create_rule() -> ToolDefinition {
             description: Some("Rule name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -49,6 +50,7 @@ fn yara_create_rule() -> ToolDefinition {
             description: Some("YARA rule content".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -71,6 +73,7 @@ fn yara_load_rules() -> ToolDefinition {
             description: Some("Path to YARA rules file or directory".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -93,6 +96,7 @@ fn yara_scan_memory() -> ToolDefinition {
             description: Some("Rule names to use (empty = all)".to_string()),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -102,6 +106,7 @@ fn yara_scan_memory() -> ToolDefinition {
             description: Some("Limit scan to specific module".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -132,6 +137,7 @@ fn find_instructions() -> ToolDefinition {
             description: Some("Instruction pattern (e.g., 'call *', 'mov *, [*]')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -141,6 +147,7 @@ fn find_instructions() -> ToolDefinition {
             description: Some("Module to search in".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -150,6 +157,7 @@ fn find_instructions() -> ToolDefinition {
             description: Some("Maximum results (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -175,6 +183,7 @@ fn signature_db_create() -> ToolDefinition {
             description: Some("Database name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -184,6 +193,7 @@ fn signature_db_create() -> ToolDefinition {
             description: Some("Database description".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -206,6 +216,7 @@ fn signature_db_add() -> ToolDefinition {
             description: Some("Database name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -215,6 +226,7 @@ fn signature_db_add() -> ToolDefinition {
             description: Some("Signature name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -224,6 +236,7 @@ fn signature_db_add() -> ToolDefinition {
             description: Some("Byte pattern with wildcards".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -246,6 +259,7 @@ fn signature_db_list() -> ToolDefinition {
             description: Some("Database name (optional, lists all DBs if omitted)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -268,6 +282,7 @@ fn signature_db_scan() -> ToolDefinition {
             description: Some("Database name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -277,6 +292,7 @@ fn signature_db_scan() -> ToolDefinition {
             description: Some("Module to scan (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -302,6 +318,7 @@ fn signature_db_export() -> ToolDefinition {
             description: Some("Database name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -311,6 +328,7 @@ fn signature_db_export() -> ToolDefinition {
             description: Some("Export file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -333,6 +351,7 @@ fn signature_db_import() -> ToolDefinition {
             description: Some("Import file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -355,6 +374,7 @@ fn signature_db_version() -> ToolDefinition {
             description: Some("Database name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -380,6 +400,7 @@ fn signature_auto_generate() -> ToolDefinition {
             description: Some("Address to generate signature for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -389,6 +410,7 @@ fn signature_auto_generate() -> ToolDefinition {
             description: Some("Size of region (default: auto-detect function)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

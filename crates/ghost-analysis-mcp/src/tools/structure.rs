@@ -37,6 +37,7 @@ fn struct_create() -> ToolDefinition {
             description: Some("Structure name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -48,6 +49,7 @@ fn struct_create() -> ToolDefinition {
             ),
             default: Some(serde_json::json!([])),
             enum_values: None,
+            items: Some(Box::new(PropertySchema::object("Field definition"))),
         },
     );
 
@@ -78,6 +80,7 @@ fn struct_get() -> ToolDefinition {
             description: Some("Structure name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -100,6 +103,7 @@ fn struct_delete() -> ToolDefinition {
             description: Some("Structure name to delete".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -125,6 +129,7 @@ fn struct_read() -> ToolDefinition {
             description: Some("Structure name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -134,6 +139,7 @@ fn struct_read() -> ToolDefinition {
             description: Some("Address to read structure from".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -156,6 +162,7 @@ fn struct_edit_field() -> ToolDefinition {
             description: Some("Structure name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -165,6 +172,7 @@ fn struct_edit_field() -> ToolDefinition {
             description: Some("Field name to edit".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -174,6 +182,7 @@ fn struct_edit_field() -> ToolDefinition {
             description: Some("New field type (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -183,6 +192,7 @@ fn struct_edit_field() -> ToolDefinition {
             description: Some("New field name (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -208,6 +218,7 @@ fn struct_export() -> ToolDefinition {
             description: Some("Structure name (optional, exports all)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -221,6 +232,7 @@ fn struct_export() -> ToolDefinition {
                 serde_json::json!("rust"),
                 serde_json::json!("json"),
             ]),
+            items: None,
         },
     );
 
@@ -246,6 +258,7 @@ fn struct_auto_analyze() -> ToolDefinition {
             description: Some("Address to analyze".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -255,6 +268,7 @@ fn struct_auto_analyze() -> ToolDefinition {
             description: Some("Size to analyze".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -280,6 +294,7 @@ fn struct_save() -> ToolDefinition {
             description: Some("File path to save to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -302,6 +317,7 @@ fn struct_load() -> ToolDefinition {
             description: Some("File path to load from".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -324,6 +340,7 @@ fn enum_create() -> ToolDefinition {
             description: Some("Enum name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -333,6 +350,7 @@ fn enum_create() -> ToolDefinition {
             description: Some("Enum values as {name: value} pairs".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

@@ -29,6 +29,7 @@ fn disasm_at() -> ToolDefinition {
             description: Some("Address to disassemble at (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -38,6 +39,7 @@ fn disasm_at() -> ToolDefinition {
             description: Some("Number of instructions to disassemble (default: 20)".to_string()),
             default: Some(serde_json::json!(20)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -47,6 +49,7 @@ fn disasm_at() -> ToolDefinition {
             description: Some("Architecture".to_string()),
             default: Some(serde_json::json!("x64")),
             enum_values: Some(vec![serde_json::json!("x64"), serde_json::json!("x86")]),
+            items: None,
         },
     );
 
@@ -69,6 +72,7 @@ fn disasm_function() -> ToolDefinition {
             description: Some("Function start address (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -78,6 +82,7 @@ fn disasm_function() -> ToolDefinition {
             description: Some("Function name (alternative to address)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -87,6 +92,7 @@ fn disasm_function() -> ToolDefinition {
             description: Some("Maximum instructions (default: 500)".to_string()),
             default: Some(serde_json::json!(500)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -112,6 +118,7 @@ fn decompile() -> ToolDefinition {
             description: Some("Function address to decompile (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -121,6 +128,7 @@ fn decompile() -> ToolDefinition {
             description: Some("Function name (alternative to address)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -136,6 +144,7 @@ fn decompile() -> ToolDefinition {
                 serde_json::json!("simplified"),
                 serde_json::json!("verbose"),
             ]),
+            items: None,
         },
     );
 
@@ -158,6 +167,7 @@ fn assemble() -> ToolDefinition {
             description: Some("Assembly code to assemble".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -167,6 +177,7 @@ fn assemble() -> ToolDefinition {
             description: Some("Base address for assembly (affects relative jumps)".to_string()),
             default: Some(serde_json::json!("0x0")),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -176,6 +187,7 @@ fn assemble() -> ToolDefinition {
             description: Some("Architecture".to_string()),
             default: Some(serde_json::json!("x64")),
             enum_values: Some(vec![serde_json::json!("x64"), serde_json::json!("x86")]),
+            items: None,
         },
     );
 
@@ -201,6 +213,7 @@ fn assemble_shellcode() -> ToolDefinition {
             description: Some("Assembly code for shellcode".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -210,6 +223,7 @@ fn assemble_shellcode() -> ToolDefinition {
             description: Some("Generate null-free shellcode (default: false)".to_string()),
             default: Some(serde_json::json!(false)),
             enum_values: None,
+            items: None,
         },
     );
 

@@ -41,6 +41,7 @@ fn ai_summarize() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -50,6 +51,7 @@ fn ai_summarize() -> ToolDefinition {
             description: Some("Additional context for summarization".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -75,6 +77,7 @@ fn ai_diff() -> ToolDefinition {
             description: Some("Original code/data".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -84,6 +87,7 @@ fn ai_diff() -> ToolDefinition {
             description: Some("Modified code/data".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -104,6 +108,7 @@ fn ai_explain_error() -> ToolDefinition {
             description: Some("Error message or crash info".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -113,6 +118,7 @@ fn ai_explain_error() -> ToolDefinition {
             description: Some("Stack trace or surrounding code".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -135,6 +141,7 @@ fn ai_recommend_breakpoints() -> ToolDefinition {
             description: Some("Function code (disassembly or decompiled)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -144,6 +151,7 @@ fn ai_recommend_breakpoints() -> ToolDefinition {
             description: Some("What you're trying to find/debug".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -169,6 +177,7 @@ fn ai_analyze_vulnerability() -> ToolDefinition {
             description: Some("Code to analyze for vulnerabilities".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -194,6 +203,7 @@ fn ai_learn_pattern() -> ToolDefinition {
             description: Some("Pattern name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -203,6 +213,7 @@ fn ai_learn_pattern() -> ToolDefinition {
             description: Some("Example code snippets".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -212,6 +223,7 @@ fn ai_learn_pattern() -> ToolDefinition {
             description: Some("What this pattern represents".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -242,6 +254,7 @@ fn debug_session_create() -> ToolDefinition {
             description: Some("Debug session name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -251,6 +264,7 @@ fn debug_session_create() -> ToolDefinition {
             description: Some("What you're trying to achieve".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -276,6 +290,7 @@ fn debug_session_info() -> ToolDefinition {
             description: Some("Debug session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -301,6 +316,7 @@ fn debug_session_update() -> ToolDefinition {
             description: Some("Debug session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -310,6 +326,7 @@ fn debug_session_update() -> ToolDefinition {
             description: Some("New findings to add to session".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -335,6 +352,7 @@ fn debug_session_close() -> ToolDefinition {
             description: Some("Debug session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -344,6 +362,7 @@ fn debug_session_close() -> ToolDefinition {
             description: Some("Final summary (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

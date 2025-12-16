@@ -59,6 +59,7 @@ fn introspect_process_list() -> ToolDefinition {
             description: Some("Include thread info (default: false)".to_string()),
             default: Some(serde_json::json!(false)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -93,6 +94,7 @@ fn introspect_memory_map() -> ToolDefinition {
             description: Some("Include mapped files (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -136,6 +138,7 @@ fn introspect_set_cwd() -> ToolDefinition {
             description: Some("New working directory path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -161,6 +164,7 @@ fn introspect_thread() -> ToolDefinition {
             description: Some("Thread ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -195,6 +199,7 @@ fn introspect_teb() -> ToolDefinition {
             description: Some("Thread ID (optional, uses current)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -220,6 +225,7 @@ fn introspect_tls() -> ToolDefinition {
             description: Some("Thread ID (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -245,6 +251,7 @@ fn introspect_module() -> ToolDefinition {
             description: Some("Module name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -279,6 +286,7 @@ fn introspect_sections() -> ToolDefinition {
             description: Some("Module name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -304,6 +312,7 @@ fn introspect_handles() -> ToolDefinition {
             description: Some("Filter by handle type (File, Key, Section, etc.)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -331,6 +340,7 @@ fn introspect_window() -> ToolDefinition {
             description: Some("Window handle (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -353,6 +363,7 @@ fn introspect_child_windows() -> ToolDefinition {
             description: Some("Parent window handle (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -387,6 +398,7 @@ fn introspect_adjust_privilege() -> ToolDefinition {
             description: Some("Privilege name (e.g., SeDebugPrivilege)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -396,6 +408,7 @@ fn introspect_adjust_privilege() -> ToolDefinition {
             description: Some("Enable or disable (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 

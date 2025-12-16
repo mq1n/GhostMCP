@@ -157,6 +157,7 @@ impl SharedMetaTools {
                 description: Some("Filter by category name".to_string()),
                 default: None,
                 enum_values: None,
+                items: None,
             },
         );
 
@@ -182,6 +183,7 @@ impl SharedMetaTools {
                 description: Some("Name of the tool to get documentation for".to_string()),
                 default: None,
                 enum_values: None,
+                items: None,
             },
         );
 

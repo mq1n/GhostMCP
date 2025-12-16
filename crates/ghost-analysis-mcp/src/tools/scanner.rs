@@ -36,6 +36,7 @@ fn scan_new() -> ToolDefinition {
             description: Some("Scan session name (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -54,6 +55,7 @@ fn scan_new() -> ToolDefinition {
                 serde_json::json!("string"),
                 serde_json::json!("bytes"),
             ]),
+            items: None,
         },
     );
     props.insert(
@@ -69,6 +71,7 @@ fn scan_new() -> ToolDefinition {
                 serde_json::json!("between"),
                 serde_json::json!("unknown"),
             ]),
+            items: None,
         },
     );
 
@@ -91,6 +94,7 @@ fn scan_first() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -100,6 +104,7 @@ fn scan_first() -> ToolDefinition {
             description: Some("Value to search for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -115,6 +120,7 @@ fn scan_first() -> ToolDefinition {
                 serde_json::json!("between"),
                 serde_json::json!("unknown"),
             ]),
+            items: None,
         },
     );
 
@@ -137,6 +143,7 @@ fn scan_next() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -146,6 +153,7 @@ fn scan_next() -> ToolDefinition {
             description: Some("New value to filter by".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -161,6 +169,7 @@ fn scan_next() -> ToolDefinition {
                 serde_json::json!("changed"),
                 serde_json::json!("unchanged"),
             ]),
+            items: None,
         },
     );
 
@@ -186,6 +195,7 @@ fn scan_results() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -195,6 +205,7 @@ fn scan_results() -> ToolDefinition {
             description: Some("Result offset (default: 0)".to_string()),
             default: Some(serde_json::json!(0)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -204,6 +215,7 @@ fn scan_results() -> ToolDefinition {
             description: Some("Maximum results (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -226,6 +238,7 @@ fn scan_count() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -248,6 +261,7 @@ fn scan_progress() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -270,6 +284,7 @@ fn scan_cancel() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -292,6 +307,7 @@ fn scan_close() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -322,6 +338,7 @@ fn scan_export() -> ToolDefinition {
             description: Some("Scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -331,6 +348,7 @@ fn scan_export() -> ToolDefinition {
             description: Some("Path to export to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -353,6 +371,7 @@ fn scan_import() -> ToolDefinition {
             description: Some("Path to import from".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

@@ -41,6 +41,7 @@ fn session_attach() -> ToolDefinition {
             description: Some("Process ID to attach to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -50,6 +51,7 @@ fn session_attach() -> ToolDefinition {
             description: Some("Process name to attach to (alternative to pid)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -84,6 +86,7 @@ fn process_list() -> ToolDefinition {
             description: Some("Filter by process name pattern (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -109,6 +112,7 @@ fn process_spawn() -> ToolDefinition {
             description: Some("Path to executable".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -118,6 +122,7 @@ fn process_spawn() -> ToolDefinition {
             description: Some("Command line arguments (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -127,6 +132,7 @@ fn process_spawn() -> ToolDefinition {
             description: Some("Start process suspended (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -154,6 +160,7 @@ fn process_resume() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -178,6 +185,7 @@ fn process_terminate() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -187,6 +195,7 @@ fn process_terminate() -> ToolDefinition {
             description: Some("Exit code (default: 0)".to_string()),
             default: Some(serde_json::json!(0)),
             enum_values: None,
+            items: None,
         },
     );
 

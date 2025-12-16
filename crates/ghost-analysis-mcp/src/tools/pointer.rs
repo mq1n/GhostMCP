@@ -40,6 +40,7 @@ fn pointer_scan_create() -> ToolDefinition {
             description: Some("Target address to find pointers to".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -49,6 +50,7 @@ fn pointer_scan_create() -> ToolDefinition {
             description: Some("Maximum offset per level (default: 4096)".to_string()),
             default: Some(serde_json::json!(4096)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -58,6 +60,7 @@ fn pointer_scan_create() -> ToolDefinition {
             description: Some("Maximum pointer chain depth (default: 5)".to_string()),
             default: Some(serde_json::json!(5)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -83,6 +86,7 @@ fn pointer_scan_start() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -105,6 +109,7 @@ fn pointer_scan_rescan() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -114,6 +119,7 @@ fn pointer_scan_rescan() -> ToolDefinition {
             description: Some("New address to filter pointer paths".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -123,6 +129,7 @@ fn pointer_scan_rescan() -> ToolDefinition {
             description: Some("Remove invalid paths (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -132,6 +139,7 @@ fn pointer_scan_rescan() -> ToolDefinition {
             description: Some("Update stability scores (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -157,6 +165,7 @@ fn pointer_scan_results() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -166,6 +175,7 @@ fn pointer_scan_results() -> ToolDefinition {
             description: Some("Maximum results (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -191,6 +201,7 @@ fn pointer_scan_count() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -216,6 +227,7 @@ fn pointer_scan_progress() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -241,6 +253,7 @@ fn pointer_scan_cancel() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -263,6 +276,7 @@ fn pointer_scan_close() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -297,6 +311,7 @@ fn pointer_resolve() -> ToolDefinition {
             description: Some("Base address or module name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -306,6 +321,7 @@ fn pointer_resolve() -> ToolDefinition {
             description: Some("Array of offsets in the pointer chain".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -331,6 +347,7 @@ fn pointer_scan_compare() -> ToolDefinition {
             description: Some("First pointer scan ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -340,6 +357,7 @@ fn pointer_scan_compare() -> ToolDefinition {
             description: Some("Second pointer scan ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -365,6 +383,7 @@ fn pointer_scan_export() -> ToolDefinition {
             description: Some("Pointer scan session ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -374,6 +393,7 @@ fn pointer_scan_export() -> ToolDefinition {
             description: Some("Export file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -399,6 +419,7 @@ fn pointer_scan_import() -> ToolDefinition {
             description: Some("Import file path".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

@@ -29,6 +29,7 @@ fn module_list() -> ToolDefinition {
             description: Some("Filter modules by name pattern (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -54,6 +55,7 @@ fn module_exports() -> ToolDefinition {
             description: Some("Module name (e.g., 'kernel32.dll')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -63,6 +65,7 @@ fn module_exports() -> ToolDefinition {
             description: Some("Filter exports by name pattern (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -88,6 +91,7 @@ fn module_imports() -> ToolDefinition {
             description: Some("Module name (e.g., 'target.exe')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -97,6 +101,7 @@ fn module_imports() -> ToolDefinition {
             description: Some("Filter imports by name pattern (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -124,6 +129,7 @@ fn string_list() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -133,6 +139,7 @@ fn string_list() -> ToolDefinition {
             description: Some("Minimum string length (default: 4)".to_string()),
             default: Some(serde_json::json!(4)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -146,6 +153,7 @@ fn string_list() -> ToolDefinition {
                 serde_json::json!("utf16"),
                 serde_json::json!("ascii"),
             ]),
+            items: None,
         },
     );
 
@@ -171,6 +179,7 @@ fn symbol_resolve() -> ToolDefinition {
             description: Some("Address to resolve (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -180,6 +189,7 @@ fn symbol_resolve() -> ToolDefinition {
             description: Some("Symbol name to resolve (e.g., 'kernel32!CreateFileW')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

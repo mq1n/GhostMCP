@@ -49,6 +49,7 @@ fn safety_set_mode() -> ToolDefinition {
                 serde_json::json!("standard"),
                 serde_json::json!("expert"),
             ]),
+            items: None,
         },
     );
 
@@ -74,6 +75,7 @@ fn safety_approve() -> ToolDefinition {
             description: Some("Request ID to approve".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -108,6 +110,7 @@ fn safety_config() -> ToolDefinition {
             description: Some("Config key to get or set".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -117,6 +120,7 @@ fn safety_config() -> ToolDefinition {
             description: Some("Value to set (omit to get current value)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -144,6 +148,7 @@ fn safety_backup() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -153,6 +158,7 @@ fn safety_backup() -> ToolDefinition {
             description: Some("Include full memory snapshot (large!)".to_string()),
             default: Some(serde_json::json!(false)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -178,6 +184,7 @@ fn safety_reset() -> ToolDefinition {
             description: Some("Backup to restore from (optional, uses latest)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -203,6 +210,7 @@ fn patch_history() -> ToolDefinition {
             description: Some("Maximum entries to return (default: 50)".to_string()),
             default: Some(serde_json::json!(50)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -212,6 +220,7 @@ fn patch_history() -> ToolDefinition {
             description: Some("Filter by client ID (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -237,6 +246,7 @@ fn patch_undo() -> ToolDefinition {
             description: Some("Specific patch ID to undo".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -248,6 +258,7 @@ fn patch_undo() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -273,6 +284,7 @@ fn patch_preview() -> ToolDefinition {
             description: Some("Address to preview patch at".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -282,6 +294,7 @@ fn patch_preview() -> ToolDefinition {
             description: Some("Data to write (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 

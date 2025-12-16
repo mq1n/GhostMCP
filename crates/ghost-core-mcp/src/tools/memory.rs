@@ -31,6 +31,7 @@ fn memory_read() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -40,6 +41,7 @@ fn memory_read() -> ToolDefinition {
             description: Some("Number of bytes to read (default: 256, max: 16MB)".to_string()),
             default: Some(serde_json::json!(256)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -53,6 +55,7 @@ fn memory_read() -> ToolDefinition {
                 serde_json::json!("bytes"),
                 serde_json::json!("string"),
             ]),
+            items: None,
         },
     );
 
@@ -78,6 +81,7 @@ fn memory_write() -> ToolDefinition {
             description: Some("Memory address to write to (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -87,6 +91,7 @@ fn memory_write() -> ToolDefinition {
             description: Some("Data to write (hex string, e.g., '90 90 90' for NOPs)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -99,6 +104,7 @@ fn memory_write() -> ToolDefinition {
             ),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -124,6 +130,7 @@ fn memory_search() -> ToolDefinition {
             description: Some("Value to search for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -142,6 +149,7 @@ fn memory_search() -> ToolDefinition {
                 serde_json::json!("string"),
                 serde_json::json!("bytes"),
             ]),
+            items: None,
         },
     );
     props.insert(
@@ -151,6 +159,7 @@ fn memory_search() -> ToolDefinition {
             description: Some("Start address for search range (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -160,6 +169,7 @@ fn memory_search() -> ToolDefinition {
             description: Some("End address for search range (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -185,6 +195,7 @@ fn memory_search_pattern() -> ToolDefinition {
             description: Some("Byte pattern with wildcards (e.g., '48 8B ?? ?? 00')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -194,6 +205,7 @@ fn memory_search_pattern() -> ToolDefinition {
             description: Some("Limit search to specific module (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -219,6 +231,7 @@ fn memory_regions() -> ToolDefinition {
             description: Some("Filter by protection (e.g., 'rwx', 'r-x')".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -228,6 +241,7 @@ fn memory_regions() -> ToolDefinition {
             description: Some("Include memory-mapped files".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 

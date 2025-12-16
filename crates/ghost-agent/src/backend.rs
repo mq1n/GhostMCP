@@ -34,12 +34,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast::error::TryRecvError;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HMODULE};
-use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory, WriteProcessMemory};
+use windows::Win32::System::Diagnostics::Debug::{
+    IsDebuggerPresent, ReadProcessMemory, WriteProcessMemory,
+};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
     VirtualAlloc, VirtualProtect, VirtualProtectEx, VirtualQuery, VirtualQueryEx,
-    MEMORY_BASIC_INFORMATION,
-    MEM_COMMIT, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+    MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
 };
 use windows::Win32::System::ProcessStatus::{
     EnumProcessModules, GetModuleBaseNameW, GetModuleFileNameExW, GetModuleInformation, MODULEINFO,
@@ -2794,7 +2795,8 @@ impl MemoryAccess for InProcessBackend {
                 if result.is_err() || bytes_written != data.len() {
                     // Restore protection before returning error
                     let mut tmp = PAGE_PROTECTION_FLAGS::default();
-                    let _ = VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
+                    let _ =
+                        VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
                     return Err(Error::MemoryAccess {
                         address: addr,
                         message: "WriteProcessMemory failed".into(),
@@ -4583,8 +4585,8 @@ impl MultiClientBackend {
         let bytes = hex::decode(&bytes_hex_clean)
             .map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
 
-        // Read original bytes for patch tracking
-        let original = self.backend.read(addr, bytes.len())?;
+        // Read original bytes for patch tracking (best effort - don't fail write if read fails)
+        let original = self.backend.read(addr, bytes.len()).ok();
 
         tracing::debug!(
             target: "ghost_agent::backend",
@@ -4597,8 +4599,12 @@ impl MultiClientBackend {
         // Perform the write
         self.backend.write(addr, &bytes)?;
 
-        // Track patch in shared state
-        let mut patch = PatchEntry::new(addr as u64, original.clone(), bytes.clone());
+        // Track patch in shared state (use empty vec if original read failed)
+        let mut patch = PatchEntry::new(
+            addr as u64,
+            original.clone().unwrap_or_default(),
+            bytes.clone(),
+        );
         patch.applied_by = client_id.map(|s| s.to_string());
 
         let patch_id = match self.state.add_patch(patch) {

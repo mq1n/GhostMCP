@@ -29,6 +29,7 @@ fn action_last() -> ToolDefinition {
             description: Some("Number of recent actions to retrieve (default: 10)".to_string()),
             default: Some(serde_json::json!(10)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -54,6 +55,7 @@ fn action_verify() -> ToolDefinition {
             description: Some("Expected success state (default: true)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -63,6 +65,7 @@ fn action_verify() -> ToolDefinition {
             description: Some("Expected tool name (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -72,6 +75,7 @@ fn action_verify() -> ToolDefinition {
             description: Some("Substring that should appear in the result".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -106,6 +110,7 @@ fn agent_reconnect() -> ToolDefinition {
             description: Some("Force reconnect even if already connected".to_string()),
             default: Some(serde_json::json!(false)),
             enum_values: None,
+            items: None,
         },
     );
 

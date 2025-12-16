@@ -36,6 +36,7 @@ fn script_load() -> ToolDefinition {
             description: Some("Path to script file".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -45,6 +46,7 @@ fn script_load() -> ToolDefinition {
             description: Some("Inline script code (alternative to path)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -54,6 +56,7 @@ fn script_load() -> ToolDefinition {
             description: Some("Script name identifier".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -76,6 +79,7 @@ fn script_unload() -> ToolDefinition {
             description: Some("Script name to unload".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -98,6 +102,7 @@ fn script_reload() -> ToolDefinition {
             description: Some("Script name to reload".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -125,6 +130,7 @@ fn script_status() -> ToolDefinition {
             description: Some("Script name to get status for".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -150,6 +156,7 @@ fn hook_create() -> ToolDefinition {
             description: Some("Address to hook (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -159,6 +166,7 @@ fn hook_create() -> ToolDefinition {
             description: Some("Lua callback function name".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -172,6 +180,7 @@ fn hook_create() -> ToolDefinition {
                 serde_json::json!("iat"),
                 serde_json::json!("vmt"),
             ]),
+            items: None,
         },
     );
 
@@ -197,6 +206,7 @@ fn hook_remove() -> ToolDefinition {
             description: Some("Hook ID to remove".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -217,6 +227,7 @@ fn hook_enable() -> ToolDefinition {
             description: Some("Hook ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -226,6 +237,7 @@ fn hook_enable() -> ToolDefinition {
             description: Some("Enable (true) or disable (false)".to_string()),
             default: Some(serde_json::json!(true)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -262,6 +274,7 @@ fn rpc_call() -> ToolDefinition {
             description: Some("RPC function name to call".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -271,6 +284,7 @@ fn rpc_call() -> ToolDefinition {
             description: Some("Arguments to pass to the function".to_string()),
             default: Some(serde_json::json!({})),
             enum_values: None,
+            items: None,
         },
     );
 

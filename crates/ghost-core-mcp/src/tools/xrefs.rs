@@ -23,6 +23,7 @@ fn xref_to() -> ToolDefinition {
             description: Some("Address to find references to (hex string)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -32,6 +33,7 @@ fn xref_to() -> ToolDefinition {
             description: Some("Limit search to specific module (optional)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -41,6 +43,7 @@ fn xref_to() -> ToolDefinition {
             description: Some("Maximum results to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 

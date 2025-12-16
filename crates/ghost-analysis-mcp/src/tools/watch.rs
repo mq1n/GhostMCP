@@ -36,6 +36,7 @@ fn watch_address_create() -> ToolDefinition {
             description: Some("Address to watch".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -45,6 +46,7 @@ fn watch_address_create() -> ToolDefinition {
             description: Some("Size of memory region to watch".to_string()),
             default: Some(serde_json::json!(4)),
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -58,6 +60,7 @@ fn watch_address_create() -> ToolDefinition {
                 serde_json::json!("write"),
                 serde_json::json!("access"),
             ]),
+            items: None,
         },
     );
 
@@ -83,6 +86,7 @@ fn watch_instruction_create() -> ToolDefinition {
             description: Some("Instruction address to watch".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -92,6 +96,7 @@ fn watch_instruction_create() -> ToolDefinition {
             description: Some("Number of instructions to watch (default: 1)".to_string()),
             default: Some(serde_json::json!(1)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -122,6 +127,7 @@ fn watch_hits_get() -> ToolDefinition {
             description: Some("Watchpoint ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -131,6 +137,7 @@ fn watch_hits_get() -> ToolDefinition {
             description: Some("Maximum hits to return (default: 100)".to_string()),
             default: Some(serde_json::json!(100)),
             enum_values: None,
+            items: None,
         },
     );
 
@@ -156,6 +163,7 @@ fn watch_accessed_get() -> ToolDefinition {
             description: Some("Watchpoint ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -181,6 +189,7 @@ fn watch_pause() -> ToolDefinition {
             description: Some("Watchpoint ID (omit to pause all)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -201,6 +210,7 @@ fn watch_resume() -> ToolDefinition {
             description: Some("Watchpoint ID (omit to resume all)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -223,6 +233,7 @@ fn watch_remove() -> ToolDefinition {
             description: Some("Watchpoint ID".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -245,6 +256,7 @@ fn watch_clear_hits() -> ToolDefinition {
             description: Some("Watchpoint ID (omit to clear all)".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
 
@@ -270,6 +282,7 @@ fn watch_quick_action() -> ToolDefinition {
             description: Some("Address to find what accesses/writes".to_string()),
             default: None,
             enum_values: None,
+            items: None,
         },
     );
     props.insert(
@@ -283,6 +296,7 @@ fn watch_quick_action() -> ToolDefinition {
                 serde_json::json!("find_what_reads"),
                 serde_json::json!("find_what_accesses"),
             ]),
+            items: None,
         },
     );
 
