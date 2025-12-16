@@ -35,8 +35,8 @@ use windows::Win32::Foundation::{CloseHandle, HANDLE, HMODULE};
 use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
-    VirtualAlloc, VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT,
-    PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+    VirtualAlloc, VirtualProtect, VirtualQuery, VirtualQueryEx, MEMORY_BASIC_INFORMATION,
+    MEM_COMMIT, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
 };
 use windows::Win32::System::ProcessStatus::{
     EnumProcessModules, GetModuleBaseNameW, GetModuleFileNameExW, GetModuleInformation, MODULEINFO,
@@ -2052,15 +2052,25 @@ impl MemoryAccess for InProcessBackend {
         // through the kernel and bypasses ASan's shadow memory checks.
         unsafe {
             let ptr = addr as *const u8;
+            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
 
-            // Validate memory is readable
+            // Validate memory is readable - use VirtualQueryEx for remote process
             let mut mbi = MEMORY_BASIC_INFORMATION::default();
-            if VirtualQuery(
-                Some(ptr as *const _),
-                &mut mbi,
-                std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-            ) == 0
-            {
+            let query_result = if self.process_handle.is_some() {
+                VirtualQueryEx(
+                    process,
+                    Some(ptr as *const _),
+                    &mut mbi,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                )
+            } else {
+                VirtualQuery(
+                    Some(ptr as *const _),
+                    &mut mbi,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                )
+            };
+            if query_result == 0 {
                 return Err(Error::MemoryAccess {
                     address: addr,
                     message: "VirtualQuery failed".into(),
@@ -2094,7 +2104,6 @@ impl MemoryAccess for InProcessBackend {
             }
 
             // Use ReadProcessMemory to avoid triggering ASan instrumentation
-            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
             let mut buffer = vec![0u8; safe_size];
             let mut bytes_read: usize = 0;
 
