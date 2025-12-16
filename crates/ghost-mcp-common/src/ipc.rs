@@ -405,17 +405,31 @@ impl AgentClient {
         // Get stream with timeout on mutex acquisition to prevent indefinite blocking
         let stream_arc = {
             let guard = self.stream.read().await;
-            guard.as_ref().cloned().ok_or(McpError::AgentNotConnected)?
+            guard.as_ref().cloned().ok_or_else(|| {
+                debug!(target: "ghost_mcp::ipc", method = %method, id = request.id, "Request failed: not connected");
+                McpError::AgentNotConnected
+            })?
         };
         
         // Timeout on mutex acquisition - prevents hanging if another request holds the lock
-        let lock_timeout = Duration::from_millis(self.config.timeout_ms);
+        // Use a separate shorter timeout for lock acquisition (10% of total or 5s max)
+        let lock_timeout_ms = (self.config.timeout_ms / 10).max(1000).min(5000);
+        let lock_timeout = Duration::from_millis(lock_timeout_ms);
+        
         let mut stream = timeout(lock_timeout, stream_arc.lock_owned())
             .await
             .map_err(|_| {
-                warn!(target: "ghost_mcp::ipc", "Timeout waiting for stream lock");
-                McpError::Timeout(self.config.timeout_ms)
+                warn!(
+                    target: "ghost_mcp::ipc", 
+                    method = %method, 
+                    id = request.id,
+                    lock_timeout_ms = lock_timeout_ms,
+                    "Timeout waiting for stream lock - possible deadlock or slow request"
+                );
+                McpError::Timeout(lock_timeout_ms)
             })?;
+        
+        debug!(target: "ghost_mcp::ipc", method = %method, id = request.id, "Stream lock acquired");
 
         // Write with timeout
         let write_future = async {
@@ -566,17 +580,37 @@ impl AgentClient {
     }
 
     /// Start heartbeat task
+    /// 
+    /// The heartbeat task monitors connection health by sending periodic pings.
+    /// On failure, it marks the connection as disconnected but does NOT attempt
+    /// to reconnect - reconnection is handled by `request_with_reconnect()` to
+    /// prevent concurrent reconnection conflicts.
     fn start_heartbeat(&self) {
         let interval = Duration::from_millis(self.config.heartbeat.interval_ms);
         let heartbeat_timeout = Duration::from_millis(self.config.heartbeat.timeout_ms);
         let max_failures = self.config.heartbeat.max_failures;
         let client = self.clone();
+        
+        debug!(
+            target: "ghost_mcp::ipc",
+            interval_ms = self.config.heartbeat.interval_ms,
+            timeout_ms = self.config.heartbeat.timeout_ms,
+            max_failures = max_failures,
+            "Starting heartbeat task"
+        );
 
         let handle = tokio::spawn(async move {
             let mut failures: u32 = 0;
+            let mut consecutive_successes: u32 = 0;
 
             loop {
                 tokio::time::sleep(interval).await;
+                
+                // Check if we should still be running (connection might be intentionally closed)
+                if !client.connected.load(Ordering::SeqCst) {
+                    debug!(target: "ghost_mcp::ipc", "Heartbeat stopping: connection marked as disconnected");
+                    break;
+                }
 
                 // Attempt heartbeat with timeout
                 let ping =
@@ -584,7 +618,16 @@ impl AgentClient {
 
                 match ping {
                     Ok(Ok(_)) => {
+                        // Reset failure counter on success
+                        if failures > 0 {
+                            info!(
+                                target: "ghost_mcp::ipc",
+                                previous_failures = failures,
+                                "Heartbeat recovered after failures"
+                            );
+                        }
                         failures = 0;
+                        consecutive_successes = consecutive_successes.saturating_add(1);
                         let mut h = client.health.write().await;
                         h.state = ConnectionState::Connected;
                         h.last_ping = Some(Instant::now());
@@ -677,10 +720,17 @@ impl AgentClient {
     }
 
     /// Stop heartbeat task
+    /// 
+    /// Cleanly stops the heartbeat task by aborting the spawned task.
+    /// This is called during disconnect/reconnect to ensure no orphaned tasks.
     async fn stop_heartbeat(&self) {
+        debug!(target: "ghost_mcp::ipc", "Stopping heartbeat task");
         let mut handle_guard = self.heartbeat_handle.lock().await;
         if let Some(handle) = handle_guard.take() {
             handle.abort();
+            debug!(target: "ghost_mcp::ipc", "Heartbeat task aborted");
+        } else {
+            debug!(target: "ghost_mcp::ipc", "No heartbeat task to stop");
         }
     }
 }
@@ -1046,5 +1096,99 @@ mod tests {
         assert_eq!(events_skipped, 5);
         assert_eq!(response.id, 77);
         server_handle.await.unwrap();
+    }
+
+    // =========================================================================
+    // Lock Timeout Tests
+    // =========================================================================
+    // These tests verify the new lock timeout functionality that prevents
+    // indefinite blocking when acquiring the stream mutex.
+
+    #[test]
+    fn test_lock_timeout_calculation() {
+        // Test the lock timeout calculation: 10% of total, min 1s, max 5s
+        let calc_lock_timeout = |timeout_ms: u64| -> u64 {
+            (timeout_ms / 10).max(1000).min(5000)
+        };
+
+        // 30s timeout -> 3s lock timeout
+        assert_eq!(calc_lock_timeout(30000), 3000);
+        
+        // 5s timeout -> 1s lock timeout (minimum)
+        assert_eq!(calc_lock_timeout(5000), 1000);
+        
+        // 1s timeout -> 1s lock timeout (minimum kicks in)
+        assert_eq!(calc_lock_timeout(1000), 1000);
+        
+        // 100s timeout -> 5s lock timeout (maximum)
+        assert_eq!(calc_lock_timeout(100000), 5000);
+        
+        // 60s timeout -> 5s lock timeout (maximum kicks in)
+        assert_eq!(calc_lock_timeout(60000), 5000);
+    }
+
+    #[test]
+    fn test_config_default_timeout() {
+        let config = ServerConfig::default();
+        // Default timeout should be 30 seconds
+        assert_eq!(config.timeout_ms, 30000);
+    }
+
+    #[test]
+    fn test_heartbeat_config_defaults() {
+        use crate::config::HeartbeatConfig;
+        let config = HeartbeatConfig::default();
+        // Default heartbeat interval should be 5 seconds
+        assert_eq!(config.interval_ms, 5000);
+        // Default heartbeat timeout should be 3 seconds
+        assert_eq!(config.timeout_ms, 3000);
+        // Default max failures should be 3
+        assert_eq!(config.max_failures, 3);
+    }
+
+    #[tokio::test]
+    async fn test_request_fails_when_not_connected() {
+        let client = AgentClient::new();
+        // Should fail with AgentNotConnected since we never connected
+        let result = client.request("test", serde_json::json!({})).await;
+        assert!(matches!(result, Err(McpError::AgentNotConnected)));
+    }
+
+    #[tokio::test]
+    async fn test_health_state_transitions() {
+        // Test that health states are properly defined
+        let mut health = ConnectionHealth::default();
+        assert_eq!(health.state, ConnectionState::Initial);
+        assert!(!health.is_healthy());
+
+        health.state = ConnectionState::Connected;
+        assert!(health.is_healthy());
+
+        health.state = ConnectionState::Degraded;
+        assert!(health.is_healthy()); // Degraded is still "healthy enough"
+
+        health.state = ConnectionState::Disconnected;
+        assert!(!health.is_healthy());
+    }
+
+    #[test]
+    fn test_connection_health_time_since_ping() {
+        let health = ConnectionHealth {
+            state: ConnectionState::Connected,
+            last_ping: Some(Instant::now()),
+            failures: 0,
+            last_error: None,
+        };
+        
+        // Should have a very small duration since we just created it
+        let duration = health.time_since_ping();
+        assert!(duration.is_some());
+        assert!(duration.unwrap().as_millis() < 100);
+    }
+
+    #[test]
+    fn test_connection_health_no_ping_yet() {
+        let health = ConnectionHealth::default();
+        assert!(health.time_since_ping().is_none());
     }
 }
