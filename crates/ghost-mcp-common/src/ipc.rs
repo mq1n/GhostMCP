@@ -136,7 +136,19 @@ impl AgentClient {
 
     /// Create a new agent client with custom configuration
     pub fn with_config(config: ServerConfig) -> Self {
-        let identity = ClientIdentity::new(&config.name, crate::VERSION);
+        let mut identity = ClientIdentity::new(&config.name, crate::VERSION);
+        
+        // In debug mode (RUST_LOG set), request all capabilities for development/testing
+        if std::env::var("RUST_LOG").is_ok() {
+            identity = identity
+                .with_capability("read")
+                .with_capability("write")
+                .with_capability("execute")
+                .with_capability("debug")
+                .with_capability("admin");
+            debug!(target: "ghost_mcp::ipc", "Debug mode: requesting all capabilities");
+        }
+        
         Self {
             config,
             stream: Arc::new(RwLock::new(None)),
