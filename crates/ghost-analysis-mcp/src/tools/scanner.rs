@@ -56,6 +56,21 @@ fn scan_new() -> ToolDefinition {
             ]),
         },
     );
+    props.insert(
+        "compare".to_string(),
+        PropertySchema {
+            prop_type: "string".to_string(),
+            description: Some("Comparison type".to_string()),
+            default: Some(serde_json::json!("exact")),
+            enum_values: Some(vec![
+                serde_json::json!("exact"),
+                serde_json::json!("greater"),
+                serde_json::json!("less"),
+                serde_json::json!("between"),
+                serde_json::json!("unknown"),
+            ]),
+        },
+    );
 
     ToolDefinition::new("scan_new", "Create a new memory scan session", "scanner").with_schema(
         ToolInputSchema {

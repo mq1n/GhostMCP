@@ -1232,6 +1232,14 @@ impl InProcessBackend {
                         .ok_or(Error::Internal("Missing scan_id".into()))?
                         as u32,
                 );
+
+                if let Some(compare_str) = request.params.get("compare").and_then(|v| v.as_str()) {
+                    let compare_type = ScanCompareType::parse(compare_str).ok_or_else(|| {
+                        Error::Internal(format!("Invalid compare type: {}", compare_str))
+                    })?;
+                    self.scanner.update_session_compare(scan_id, compare_type)?;
+                }
+
                 let value = request.params["value"].as_str().unwrap_or("");
                 tracing::info!(target: "ghost_agent::backend", scan_id = scan_id.0, value = value, "Starting initial scan");
 

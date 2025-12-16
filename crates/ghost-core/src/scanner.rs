@@ -130,6 +130,17 @@ impl Scanner {
         self.sessions.read().ok()?.get(&id).cloned()
     }
 
+    /// Update session comparison type
+    pub fn update_session_compare(&self, id: ScanId, compare_type: ScanCompareType) -> Result<()> {
+        let mut sessions = self.sessions.write().map_err(|e| Error::Internal(e.to_string()))?;
+        if let Some(session) = sessions.get_mut(&id) {
+            session.options.compare_type = compare_type;
+            Ok(())
+        } else {
+            Err(Error::Internal("Session not found".into()))
+        }
+    }
+
     /// List all active sessions
     pub fn list_sessions(&self) -> Vec<ScanSession> {
         self.sessions
