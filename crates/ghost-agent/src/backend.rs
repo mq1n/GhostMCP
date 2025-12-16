@@ -381,6 +381,62 @@ impl InProcessBackend {
         true
     }
 
+    /// Safely parse a hex address from request params
+    fn safe_parse_hex_address(value: &serde_json::Value) -> Option<usize> {
+        if let Some(n) = value.as_u64() {
+            Some(n as usize)
+        } else if let Some(s) = value.as_str() {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            let s = s.trim_start_matches("0x").trim_start_matches("0X");
+            usize::from_str_radix(s, 16).ok()
+        } else {
+            None
+        }
+    }
+
+    /// Safely get a required string parameter
+    fn safe_get_str<'a>(params: &'a serde_json::Value, key: &str) -> Result<&'a str> {
+        params
+            .get(key)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| Error::Internal(format!("Missing or empty parameter: {}", key)))
+    }
+
+    /// Safely get an optional string parameter
+    fn safe_get_str_opt<'a>(params: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+        params
+            .get(key)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+    }
+
+    /// Safely get an optional integer parameter with bounds checking
+    #[allow(dead_code)]
+    fn safe_get_usize(params: &serde_json::Value, key: &str, default: usize, max: usize) -> usize {
+        params
+            .get(key)
+            .and_then(|v| v.as_u64())
+            .map(|n| (n as usize).min(max))
+            .unwrap_or(default)
+    }
+
+    /// Validate module size is reasonable before scanning
+    fn validate_scan_size(size: usize) -> Result<()> {
+        const MAX_SCAN_SIZE: usize = 256 * 1024 * 1024; // 256MB max
+        if size > MAX_SCAN_SIZE {
+            return Err(Error::Internal(format!(
+                "Scan size {} exceeds maximum allowed ({}MB)",
+                size,
+                MAX_SCAN_SIZE / (1024 * 1024)
+            )));
+        }
+        Ok(())
+    }
+
     /// Reset cancel flag (call before starting new operation)
     fn reset_cancel(&self) {
         self.cancel_flag.store(false, Ordering::Relaxed);
@@ -999,51 +1055,96 @@ impl InProcessBackend {
                 Ok(serde_json::to_value(regions)?)
             }
             "memory_search" => {
-                let value_str = request.params["value"]
-                    .as_str()
-                    .ok_or(Error::Internal("Missing value".into()))?;
-                let type_str = request.params["value_type"].as_str().unwrap_or("i32");
+                let value_str = Self::safe_get_str(&request.params, "value")?;
+                let type_str = Self::safe_get_str_opt(&request.params, "value_type").unwrap_or("i32");
                 let value_type = parse_value_type(type_str)?;
                 tracing::debug!(target: "ghost_agent::backend", value = value_str, value_type = type_str, "Searching memory");
                 let value_bytes = ghost_core::memory::value_to_bytes(value_str, value_type)?;
-                let start = request.params["start_address"]
-                    .as_str()
-                    .and_then(|s| {
-                        let s = s.trim_start_matches("0x").trim_start_matches("0X");
-                        usize::from_str_radix(s, 16).ok()
-                    });
-                let end = request.params["end_address"]
-                    .as_str()
-                    .and_then(|s| {
-                        let s = s.trim_start_matches("0x").trim_start_matches("0X");
-                        usize::from_str_radix(s, 16).ok()
-                    });
+                let start = request.params.get("start_address")
+                    .and_then(|v| Self::safe_parse_hex_address(v));
+                let end = request.params.get("end_address")
+                    .and_then(|v| Self::safe_parse_hex_address(v));
                 let results = self.search_value(&value_bytes, value_type, start, end)?;
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "Memory search complete");
                 Ok(serde_json::to_value(results)?)
             }
             "memory_search_pattern" => {
-                let pattern = request.params["pattern"]
-                    .as_str()
-                    .ok_or(Error::Internal("Missing pattern".into()))?;
-                tracing::debug!(target: "ghost_agent::backend", pattern = pattern, "Searching AOB pattern");
-                let results = self.search_pattern(pattern)?;
+                let pattern = Self::safe_get_str(&request.params, "pattern")?;
+                let module_name = Self::safe_get_str_opt(&request.params, "module");
+                
+                // Validate pattern before processing
+                let (pattern_bytes, mask) = ghost_core::PatternScanner::parse_aob_pattern(pattern)?;
+                if pattern_bytes.is_empty() {
+                    return Err(Error::Internal("Empty or invalid pattern".into()));
+                }
+                if pattern_bytes.len() < 2 {
+                    return Err(Error::Internal("Pattern too short (minimum 2 bytes)".into()));
+                }
+                
+                // If module is specified, search only within that module
+                let results = if let Some(mod_name) = module_name {
+                    let modules = self.get_modules()?;
+                    let module = modules
+                        .iter()
+                        .find(|m| m.name.eq_ignore_ascii_case(mod_name))
+                        .ok_or_else(|| Error::Internal(format!("Module '{}' not found", mod_name)))?;
+                    
+                    // Validate module size before scanning
+                    Self::validate_scan_size(module.size)?;
+                    
+                    tracing::debug!(target: "ghost_agent::backend", 
+                        pattern = pattern, 
+                        module = mod_name,
+                        base = format!("0x{:x}", module.base),
+                        size = module.size,
+                        "Searching AOB pattern in module");
+                    
+                    let mut results = Vec::new();
+                    let max_results = 1000;
+                    const MAX_CHUNK_SIZE: usize = 4 * 1024 * 1024;
+                    let mut offset = 0;
+                    
+                    while offset < module.size && results.len() < max_results {
+                        let chunk_size = (module.size - offset).min(MAX_CHUNK_SIZE);
+                        let chunk_base = module.base + offset;
+                        
+                        if let Ok(data) = self.read(chunk_base, chunk_size) {
+                            let offsets = ghost_core::PatternScanner::find_aob_in_buffer(
+                                &data,
+                                &pattern_bytes,
+                                &mask,
+                                max_results - results.len(),
+                            );
+                            for &off in &offsets {
+                                results.push(ScanResult {
+                                    address: chunk_base + off,
+                                    value: data.get(off..off + pattern_bytes.len())
+                                        .unwrap_or(&[]).to_vec(),
+                                });
+                            }
+                        }
+                        
+                        let advance = chunk_size.saturating_sub(pattern_bytes.len().saturating_sub(1));
+                        offset += if advance == 0 { chunk_size.max(1) } else { advance };
+                    }
+                    results
+                } else {
+                    tracing::debug!(target: "ghost_agent::backend", pattern = pattern, "Searching AOB pattern in all memory");
+                    self.search_pattern(pattern)?
+                };
+                
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "AOB search complete");
                 Ok(serde_json::to_value(results)?)
             }
             "module_exports" => {
-                let module = request.params["module"]
-                    .as_str()
-                    .ok_or(Error::Internal("Missing module".into()))?;
+                let module = Self::safe_get_str(&request.params, "module")?;
                 tracing::debug!(target: "ghost_agent::backend", module = module, "Getting module exports");
                 let exports = self.get_exports(module)?;
                 tracing::debug!(target: "ghost_agent::backend", module = module, count = exports.len(), "Found exports");
                 Ok(serde_json::to_value(exports)?)
             }
             "module_imports" => {
-                let module = request.params["module"]
-                    .as_str()
-                    .ok_or(Error::Internal("Missing module".into()))?;
+                let module = Self::safe_get_str(&request.params, "module")?;
                 tracing::debug!(target: "ghost_agent::backend", module = module, "Getting module imports");
                 let imports = self.get_imports(module)?;
                 tracing::debug!(target: "ghost_agent::backend", module = module, count = imports.len(), "Found imports");
