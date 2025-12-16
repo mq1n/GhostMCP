@@ -1489,6 +1489,25 @@ impl InProcessBackend {
                     serde_json::json!({"privilege": privilege, "enabled": enable, "success": success}),
                 )
             }
+            "r2_status" | "ida_status" | "ghidra_status" => {
+                let backend = method.split('_').next().unwrap_or("unknown");
+                 Ok(serde_json::json!({
+                    "backend": backend,
+                    "connected": false,
+                    "available": false,
+                    "message": "Not supported in agent",
+                    "info": null
+                }))
+            }
+            "yara_list_rules" => {
+                Ok(serde_json::json!({ "rules": [] }))
+            }
+            "signature_db_list" => {
+                 Ok(serde_json::json!({ "databases": [] }))
+            }
+            "debug_session_list" => {
+                 Ok(serde_json::json!({ "sessions": [] }))
+            }
 
             _ => {
                 tracing::warn!(target: "ghost_agent::backend", method = %method, "Unknown method");
@@ -1599,6 +1618,32 @@ impl InProcessBackend {
                 } else {
                     Err(Error::Internal(format!("Session {} not found", id)))
                 }
+            }
+            "trace_hooks_list" => {
+                let mut hooks = Vec::new();
+                for sess in tracer.list_sessions() {
+                    if let Some(s) = tracer.get_session(sess.id) {
+                        for hook in s.get_hooks() {
+                            hooks.push(serde_json::json!({
+                                "session_id": sess.id.0,
+                                "hook": hook
+                            }));
+                        }
+                    }
+                }
+                Ok(serde_json::json!({ "hooks": hooks }))
+            }
+            "trace_queue_stats" => {
+                let mut total = ghost_common::types::api_trace::QueueStats::default();
+                for info in tracer.list_sessions() {
+                    total.current_depth += info.stats.current_depth;
+                    total.max_depth = total.max_depth.max(info.stats.max_depth);
+                    total.total_captured += info.stats.total_captured;
+                    total.total_dropped += info.stats.total_dropped;
+                    total.events_per_second += info.stats.events_per_second;
+                    total.memory_bytes += info.stats.memory_bytes;
+                }
+                Ok(serde_json::json!({ "queue": total }))
             }
             _ => Err(Error::NotImplemented(format!(
                 "Trace method not implemented: {}",
