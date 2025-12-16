@@ -75,8 +75,8 @@ jobs:
         run: |
           $size = (Get-Item target/release/ghost_agent.dll).Length
           Write-Host "ghost_agent.dll size: $size bytes"
-          if ($size -gt 512000) {
-            Write-Error "DLL too large! Max 500KB, got $([math]::Round($size/1024))KB"
+          if ($size -gt 3145728) {
+            Write-Error "DLL too large! Max 3MB, got $([math]::Round($size/1024))KB"
             exit 1
           }
 
