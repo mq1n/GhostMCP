@@ -116,6 +116,24 @@ fn pointer_scan_rescan() -> ToolDefinition {
             enum_values: None,
         },
     );
+    props.insert(
+        "filter_invalid".to_string(),
+        PropertySchema {
+            prop_type: "boolean".to_string(),
+            description: Some("Remove invalid paths (default: true)".to_string()),
+            default: Some(serde_json::json!(true)),
+            enum_values: None,
+        },
+    );
+    props.insert(
+        "update_scores".to_string(),
+        PropertySchema {
+            prop_type: "boolean".to_string(),
+            description: Some("Update stability scores (default: true)".to_string()),
+            default: Some(serde_json::json!(true)),
+            enum_values: None,
+        },
+    );
 
     ToolDefinition::new(
         "pointer_scan_rescan",

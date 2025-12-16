@@ -34,10 +34,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast::error::TryRecvError;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HMODULE};
-use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory};
+use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory, WriteProcessMemory};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
-    VirtualAlloc, VirtualProtect, VirtualQuery, VirtualQueryEx, MEMORY_BASIC_INFORMATION,
+    VirtualAlloc, VirtualProtect, VirtualProtectEx, VirtualQuery, VirtualQueryEx,
+    MEMORY_BASIC_INFORMATION,
     MEM_COMMIT, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
 };
 use windows::Win32::System::ProcessStatus::{
@@ -495,7 +496,7 @@ impl InProcessBackend {
         modules.clear();
 
         unsafe {
-            let process = GetCurrentProcess();
+            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
             let mut h_modules: [HMODULE; 1024] = [HMODULE::default(); 1024];
             let mut cb_needed: u32 = 0;
 
@@ -2079,11 +2080,14 @@ impl InProcessBackend {
                     )));
                 }
 
+                let filter_invalid = request.params["filter_invalid"].as_bool().unwrap_or(true);
+                let update_scores = request.params["update_scores"].as_bool().unwrap_or(true);
+
                 let options = PointerRescanOptions {
                     scan_id,
                     new_target_address: Some(new_address),
-                    filter_invalid: true,
-                    update_scores: true,
+                    filter_invalid,
+                    update_scores,
                 };
 
                 let modules = self.get_modules()?;
@@ -2749,29 +2753,65 @@ impl MemoryAccess for InProcessBackend {
     fn write(&self, addr: usize, data: &[u8]) -> Result<()> {
         unsafe {
             let ptr = addr as *mut u8;
+            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
 
-            // Change protection to writable
+            // Change protection to writable - use VirtualProtectEx for remote process
             let mut old_protect = PAGE_PROTECTION_FLAGS::default();
-            if VirtualProtect(
-                ptr as *mut _,
-                data.len(),
-                PAGE_EXECUTE_READWRITE,
-                &mut old_protect,
-            )
-            .is_err()
-            {
+            let protect_result = if self.process_handle.is_some() {
+                VirtualProtectEx(
+                    process,
+                    ptr as *mut _,
+                    data.len(),
+                    PAGE_EXECUTE_READWRITE,
+                    &mut old_protect,
+                )
+            } else {
+                VirtualProtect(
+                    ptr as *mut _,
+                    data.len(),
+                    PAGE_EXECUTE_READWRITE,
+                    &mut old_protect,
+                )
+            };
+
+            if protect_result.is_err() {
                 return Err(Error::MemoryAccess {
                     address: addr,
                     message: "VirtualProtect failed".into(),
                 });
             }
 
-            // Write directly
-            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+            // Write memory - use WriteProcessMemory for remote process
+            if self.process_handle.is_some() {
+                let mut bytes_written: usize = 0;
+                let result = WriteProcessMemory(
+                    process,
+                    ptr as *const _,
+                    data.as_ptr() as *const _,
+                    data.len(),
+                    Some(&mut bytes_written),
+                );
+                if result.is_err() || bytes_written != data.len() {
+                    // Restore protection before returning error
+                    let mut tmp = PAGE_PROTECTION_FLAGS::default();
+                    let _ = VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
+                    return Err(Error::MemoryAccess {
+                        address: addr,
+                        message: "WriteProcessMemory failed".into(),
+                    });
+                }
+            } else {
+                // Write directly for local process
+                std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+            }
 
             // Restore protection
             let mut tmp = PAGE_PROTECTION_FLAGS::default();
-            let _ = VirtualProtect(ptr as *mut _, data.len(), old_protect, &mut tmp);
+            if self.process_handle.is_some() {
+                let _ = VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
+            } else {
+                let _ = VirtualProtect(ptr as *mut _, data.len(), old_protect, &mut tmp);
+            }
 
             Ok(())
         }
@@ -3299,70 +3339,102 @@ impl MemoryAccess for InProcessBackend {
 
 /// Additional introspection helper methods for InProcessBackend
 impl InProcessBackend {
+    /// Helper to read u16 from memory (respects process_handle for remote processes)
+    fn read_u16(&self, addr: usize) -> Result<u16> {
+        let bytes = self.read(addr, 2)?;
+        if bytes.len() < 2 {
+            return Err(Error::Internal("Insufficient bytes for u16".into()));
+        }
+        Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    /// Helper to read i32 from memory (respects process_handle for remote processes)
+    fn read_i32(&self, addr: usize) -> Result<i32> {
+        let bytes = self.read(addr, 4)?;
+        if bytes.len() < 4 {
+            return Err(Error::Internal("Insufficient bytes for i32".into()));
+        }
+        Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    }
+
+    /// Helper to read u32 from memory (respects process_handle for remote processes)
+    fn read_u32(&self, addr: usize) -> Result<u32> {
+        let bytes = self.read(addr, 4)?;
+        if bytes.len() < 4 {
+            return Err(Error::Internal("Insufficient bytes for u32".into()));
+        }
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    }
+
     /// Get TLS (Thread Local Storage) directory info from PE header
     fn get_tls_info(&self, base: usize) -> Result<Vec<serde_json::Value>> {
         let mut tls_info = Vec::new();
-        unsafe {
-            let dos_header = base as *const u8;
-            if *(dos_header as *const u16) != 0x5A4D {
-                return Ok(tls_info);
-            }
-            let e_lfanew = *((base + 0x3C) as *const i32);
-            let nt_headers = base + e_lfanew as usize;
-            // TLS directory is at offset 0xC0 in the optional header for x64
-            let tls_dir_rva = *((nt_headers + 0xC0) as *const u32);
-            let tls_dir_size = *((nt_headers + 0xC4) as *const u32);
-            if tls_dir_rva != 0 && tls_dir_size > 0 {
-                tls_info.push(serde_json::json!({
-                    "directory_rva": tls_dir_rva,
-                    "directory_size": tls_dir_size,
-                    "base": base
-                }));
-            }
+
+        // Check DOS header magic
+        let dos_magic = self.read_u16(base)?;
+        if dos_magic != 0x5A4D {
+            return Ok(tls_info);
         }
+
+        let e_lfanew = self.read_i32(base + 0x3C)?;
+        let nt_headers = base + e_lfanew as usize;
+        // TLS directory is at offset 0xC0 in the optional header for x64
+        let tls_dir_rva = self.read_u32(nt_headers + 0xC0)?;
+        let tls_dir_size = self.read_u32(nt_headers + 0xC4)?;
+
+        if tls_dir_rva != 0 && tls_dir_size > 0 {
+            tls_info.push(serde_json::json!({
+                "directory_rva": tls_dir_rva,
+                "directory_size": tls_dir_size,
+                "base": base
+            }));
+        }
+
         Ok(tls_info)
     }
 
     /// Parse PE sections from module base
     fn parse_pe_sections(&self, base: usize) -> Result<Vec<serde_json::Value>> {
         let mut sections = Vec::new();
-        unsafe {
-            let dos_header = base as *const u8;
-            if *(dos_header as *const u16) != 0x5A4D {
-                return Err(Error::Internal("Invalid DOS header".into()));
-            }
-            let e_lfanew = *((base + 0x3C) as *const i32);
-            let nt_headers = base + e_lfanew as usize;
-            let file_header = nt_headers + 4;
-            let num_sections = *((file_header + 2) as *const u16) as usize;
-            let optional_header_size = *((file_header + 16) as *const u16) as usize;
-            let section_headers = file_header + 20 + optional_header_size;
 
-            for i in 0..num_sections.min(64) {
-                let section = section_headers + (i * 40);
-                let name_bytes = std::slice::from_raw_parts(section as *const u8, 8);
-                let name = String::from_utf8_lossy(name_bytes)
-                    .trim_end_matches('\0')
-                    .to_string();
-                let virtual_size = *((section + 8) as *const u32);
-                let virtual_address = *((section + 12) as *const u32);
-                let raw_size = *((section + 16) as *const u32);
-                let raw_address = *((section + 20) as *const u32);
-                let characteristics = *((section + 36) as *const u32);
-
-                sections.push(serde_json::json!({
-                    "name": name,
-                    "virtual_address": virtual_address,
-                    "virtual_size": virtual_size,
-                    "raw_address": raw_address,
-                    "raw_size": raw_size,
-                    "characteristics": characteristics,
-                    "executable": (characteristics & 0x20000000) != 0,
-                    "readable": (characteristics & 0x40000000) != 0,
-                    "writable": (characteristics & 0x80000000) != 0
-                }));
-            }
+        // Check DOS header magic
+        let dos_magic = self.read_u16(base)?;
+        if dos_magic != 0x5A4D {
+            return Err(Error::Internal("Invalid DOS header".into()));
         }
+
+        let e_lfanew = self.read_i32(base + 0x3C)?;
+        let nt_headers = base + e_lfanew as usize;
+        let file_header = nt_headers + 4;
+        let num_sections = self.read_u16(file_header + 2)? as usize;
+        let optional_header_size = self.read_u16(file_header + 16)? as usize;
+        let section_headers = file_header + 20 + optional_header_size;
+
+        for i in 0..num_sections.min(64) {
+            let section = section_headers + (i * 40);
+            let name_bytes = self.read(section, 8)?;
+            let name = String::from_utf8_lossy(&name_bytes)
+                .trim_end_matches('\0')
+                .to_string();
+            let virtual_size = self.read_u32(section + 8)?;
+            let virtual_address = self.read_u32(section + 12)?;
+            let raw_size = self.read_u32(section + 16)?;
+            let raw_address = self.read_u32(section + 20)?;
+            let characteristics = self.read_u32(section + 36)?;
+
+            sections.push(serde_json::json!({
+                "name": name,
+                "virtual_address": virtual_address,
+                "virtual_size": virtual_size,
+                "raw_address": raw_address,
+                "raw_size": raw_size,
+                "characteristics": characteristics,
+                "executable": (characteristics & 0x20000000) != 0,
+                "readable": (characteristics & 0x40000000) != 0,
+                "writable": (characteristics & 0x80000000) != 0
+            }));
+        }
+
         Ok(sections)
     }
 
@@ -3499,34 +3571,36 @@ impl InProcessBackend {
     /// Get PE section ranges: (name, start_address, size, characteristics)
     fn get_pe_section_ranges(&self, base: usize) -> Result<Vec<(String, usize, usize, u32)>> {
         let mut sections = Vec::new();
-        unsafe {
-            let dos_header = base as *const u8;
-            if *(dos_header as *const u16) != 0x5A4D {
-                return Err(Error::Internal("Invalid DOS header".into()));
-            }
-            let e_lfanew = *((base + 0x3C) as *const i32);
-            let nt_headers = base + e_lfanew as usize;
-            let file_header = nt_headers + 4;
-            let num_sections = *((file_header + 2) as *const u16) as usize;
-            let optional_header_size = *((file_header + 16) as *const u16) as usize;
-            let section_headers = file_header + 20 + optional_header_size;
 
-            for i in 0..num_sections.min(64) {
-                let section = section_headers + (i * 40);
-                let name_bytes = std::slice::from_raw_parts(section as *const u8, 8);
-                let name = String::from_utf8_lossy(name_bytes)
-                    .trim_end_matches('\0')
-                    .to_string();
-                let virtual_size = *((section + 8) as *const u32) as usize;
-                let virtual_address = *((section + 12) as *const u32) as usize;
-                let characteristics = *((section + 36) as *const u32);
-
-                // Calculate actual section address in memory
-                let section_start = base + virtual_address;
-
-                sections.push((name, section_start, virtual_size, characteristics));
-            }
+        // Check DOS header magic
+        let dos_magic = self.read_u16(base)?;
+        if dos_magic != 0x5A4D {
+            return Err(Error::Internal("Invalid DOS header".into()));
         }
+
+        let e_lfanew = self.read_i32(base + 0x3C)?;
+        let nt_headers = base + e_lfanew as usize;
+        let file_header = nt_headers + 4;
+        let num_sections = self.read_u16(file_header + 2)? as usize;
+        let optional_header_size = self.read_u16(file_header + 16)? as usize;
+        let section_headers = file_header + 20 + optional_header_size;
+
+        for i in 0..num_sections.min(64) {
+            let section = section_headers + (i * 40);
+            let name_bytes = self.read(section, 8)?;
+            let name = String::from_utf8_lossy(&name_bytes)
+                .trim_end_matches('\0')
+                .to_string();
+            let virtual_size = self.read_u32(section + 8)? as usize;
+            let virtual_address = self.read_u32(section + 12)? as usize;
+            let characteristics = self.read_u32(section + 36)?;
+
+            // Calculate actual section address in memory
+            let section_start = base + virtual_address;
+
+            sections.push((name, section_start, virtual_size, characteristics));
+        }
+
         Ok(sections)
     }
 }
@@ -5112,10 +5186,8 @@ impl MultiClientBackend {
             return Err(Error::Internal("Data cannot be empty".into()));
         }
 
-        unsafe {
-            let dst = address as *mut u8;
-            std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
-        }
+        // Use the proper write method that respects process_handle
+        self.backend.write(address, &data)?;
 
         Ok(serde_json::json!({
             "written": data.len(),
