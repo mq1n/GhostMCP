@@ -1,0 +1,8 @@
+[
+  {
+    "uri": "ghost://status",
+    "name": "Server Status",
+    "description": "Current status of the Ghost MCP server and connected agent",
+    "mimeType": "application/json"
+  }
+]

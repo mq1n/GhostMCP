@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Build
+        run: cargo build --release --workspace
+
+      - name: Run unit tests
+        run: cargo test --workspace --lib
+
+      - name: Run integration tests
+        run: cargo test --workspace --test '*'
+
+      - name: Validate tool registry limits
+        run: |
+          echo "Checking ghost-mcp-common registry enforcement..."
+          cargo test --package ghost-mcp-common registry::tests
+
+      - name: Validate modular server registries
+        run: |
+          echo "Validating ghost-core-mcp registry..."
+          cargo run --package ghost-core-mcp -- --validate-registry
+          echo "Validating ghost-analysis-mcp registry..."
+          cargo run --package ghost-analysis-mcp -- --validate-registry
+          echo "Validating ghost-static-mcp registry..."
+          cargo run --package ghost-static-mcp -- --validate-registry
+          echo "Validating ghost-extended-mcp registry..."
+          cargo run --package ghost-extended-mcp -- --validate-registry
+
+      - name: Run tool count golden tests
+        run: cargo test --test tool_count_golden -- --nocapture
+
+      - name: Run multi-server integration tests
+        run: |
+          echo "Running multi-server integration tests..."
+          cargo test --test integration test_multi_server_integration -- --nocapture
+
+      - name: Check DLL size
+        run: |
+          $size = (Get-Item target/release/ghost_agent.dll).Length
+          Write-Host "ghost_agent.dll size: $size bytes"
+          if ($size -gt 512000) {
+            Write-Error "DLL too large! Max 500KB, got $([math]::Round($size/1024))KB"
+            exit 1
+          }
+
+  test-integration:
+    runs-on: windows-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binaries
+        run: cargo build --release --workspace
+
+      - name: Run multi-client integration tests
+        run: |
+          cargo test --test multi_client -- --nocapture
+          cargo test --test tool_count_golden -- --nocapture
+
+      - name: Run multi-server integration tests
+        run: |
+          echo "Multi-server integration tests"
+          cargo test --test integration test_multi_server_integration -- --nocapture
+
+      - name: Run live agent tests (if target available)
+        continue-on-error: true
+        run: |
+          # Start test target in background
+          $proc = Start-Process -FilePath "target/release/ghost-test-target.exe" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 2
+          
+          # Inject agent
+          & target/release/ghost-loader.exe -t $proc.Id -d target/release/ghost_agent.dll
+          Start-Sleep -Seconds 2
+          
+          # Run tests that require agent
+          cargo test --test integration multi_client::test_multi_client_handshake -- --ignored --nocapture
+          cargo test --test integration multi_client::test_connection_health_after_connect -- --ignored --nocapture
+          
+          # Cleanup
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+
+      - name: Run legacy integration tests
+        continue-on-error: true
+        run: |
+          # Start test target in background
+          Start-Process -FilePath "target/release/ghost-test-target.exe" -NoNewWindow
+          Start-Sleep -Seconds 2
+          
+          # Run tests
+          cargo test --package ghost-test-harness 2>$null || echo "ghost-test-harness not available"

@@ -1,0 +1,15 @@
+[package]
+name = "ghost-agent-exe"
+version.workspace = true
+edition = "2021"
+description = "Standalone external agent for Ghost-MCP (future)"
+
+[[bin]]
+name = "ghost-agent-exe"
+path = "src/main.rs"
+
+[dependencies]
+ghost-common = { path = "../ghost-common" }
+ghost-core = { path = "../ghost-core" }
+windows = { workspace = true }
+clap = { version = "4", features = ["derive"] }

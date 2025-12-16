@@ -1,0 +1,4717 @@
+{
+  "id": "ws2_32",
+  "name": "ws2_32",
+  "version": "1.0.0",
+  "description": "Windows ws2_32 API definitions (converted from Rohitab API Monitor)",
+  "module": "Ws2_32.dll",
+  "functions": [
+    {
+      "name": "accept",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "addr",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "addrlen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "bind",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "namelen"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "closesocket",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "connect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "namelen"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "freeaddrinfo",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "ai",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Void"
+      }
+    },
+    {
+      "name": "getaddrinfo",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "nodename",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "servname",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hints",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "res",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Pointer": {
+                  "inner": {
+                    "Primitive": "Void"
+                  },
+                  "nullable": true
+                }
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "FreeAddrInfoEx",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pAddrInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Void"
+      }
+    },
+    {
+      "name": "GetAddrInfoEx",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pServiceName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwNameSpace",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNspId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pHints",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "ppResult",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Pointer": {
+                  "inner": {
+                    "Primitive": "Void"
+                  },
+                  "nullable": true
+                }
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpNameHandle",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "FreeAddrInfoW",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pAddrInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Void"
+      }
+    },
+    {
+      "name": "GetAddrInfoW",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pNodeName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pServiceName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pHints",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "ppResult",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Pointer": {
+                  "inner": {
+                    "Primitive": "Void"
+                  },
+                  "nullable": true
+                }
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "gethostbyaddr",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "addr",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "type",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "gethostbyname",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "gethostname",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "getnameinfo",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "sa",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "salen"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "salen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "host",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hostlen",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "serv",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "servlen",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "flags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "GetNameInfoW",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pSockaddr",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "SockaddrLength",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pNodeBuffer",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "NodeBufferSize",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pServiceBuffer",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "ServiceBufferSize",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "Flags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "getpeername",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "getprotobyname",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "getprotobynumber",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "number",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "getservbyname",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "proto",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "getservbyport",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "port",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "proto",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Pointer": {
+          "inner": {
+            "Primitive": "Void"
+          },
+          "nullable": true
+        }
+      }
+    },
+    {
+      "name": "getsockname",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "namelen"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "getsockopt",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "level",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "optname",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "optval",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "optlen"
+              }
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "optlen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "htonl",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hostlong",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "htons",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hostshort",
+          "type": {
+            "Primitive": "UInt16"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt16"
+      }
+    },
+    {
+      "name": "inet_addr",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "cp",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "inet_ntoa",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "in",
+          "type": {
+            "Primitive": "Void"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "String": {
+          "encoding": "Ansi",
+          "max_length": 260
+        }
+      }
+    },
+    {
+      "name": "InetNtopW",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "Family",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pAddr",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pStringBuf",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "StringBufSize",
+          "type": {
+            "Primitive": "Int64"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "String": {
+          "encoding": "Unicode",
+          "max_length": 260
+        }
+      }
+    },
+    {
+      "name": "inet_ntop",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "Family",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pAddr",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pStringBuf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "StringBufSize",
+          "type": {
+            "Primitive": "Int64"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "String": {
+          "encoding": "Ansi",
+          "max_length": 260
+        }
+      }
+    },
+    {
+      "name": "inet_pton",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "Family",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pszAddrString",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pAddrBuf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "String": {
+          "encoding": "Ansi",
+          "max_length": 260
+        }
+      }
+    },
+    {
+      "name": "InetPtonW",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "Family",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pszAddrString",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pAddrBuf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "String": {
+          "encoding": "Unicode",
+          "max_length": 260
+        }
+      }
+    },
+    {
+      "name": "ioctlsocket",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "cmd",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "argp",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "listen",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "backlog",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "ntohl",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "netlong",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "ntohs",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "netshort",
+          "type": {
+            "Primitive": "UInt16"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt16"
+      }
+    },
+    {
+      "name": "recv",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "Return"
+              }
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "flags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "recvfrom",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "Return"
+              }
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "flags",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "from",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "fromlen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "select",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "nfds",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "readfds",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "writefds",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "exceptfds",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "send",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "len"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "flags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "sendto",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "len"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "flags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "to",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "tolen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "SetAddrInfoEx",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "pName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pServiceName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "pAddresses",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwAddressCount",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpBlob",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwNameSpace",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNspId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpNameHandle",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "setsockopt",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "level",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "optname",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "optval",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "optlen"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "optlen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "shutdown",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "how",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "socket",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "af",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "type",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "protocol",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAccept",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "addr",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "addrlen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpfnCondition",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwCallbackData",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAddressToString",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpsaAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwAddressLength",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpProtocolInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpszAddressString",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwAddressStringLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAAsyncGetHostByAddr",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "addr",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "len",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "type",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncGetHostByName",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncGetProtoByName",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncGetProtoByNumber",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "number",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncGetServByName",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "proto",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncGetServByPort",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "port",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "proto",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buf",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "buflen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAAsyncSelect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hWnd",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "wMsg",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lEvent",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSACancelAsyncRequest",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hAsyncTaskHandle",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSACleanup",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSACloseEvent",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hEvent",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSAConnect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCallerData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCalleeData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpSQOS",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpGQOS",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAConnectByList",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "SocketAddressList",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "LocalAddressLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "LocalAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "RemoteAddressLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "RemoteAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "Reserved",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSAConnectByName",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "nodename",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "servicename",
+          "type": {
+            "String": {
+              "encoding": "Ansi",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "LocalAddressLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "LocalAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "RemoteAddressLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "RemoteAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "Reserved",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSACreateEvent",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSADuplicateSocket",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwProcessId",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpProtocolInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAEnumNameSpaceProviders",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpnspBuffer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAEnumNameSpaceProvidersEx",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpnspBuffer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAEnumNetworkEvents",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hEventObject",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNetworkEvents",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAEnumProtocols",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpiProtocols",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpProtocolBuffer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAEventSelect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hEventObject",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lNetworkEvents",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAGetLastError",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "WSAGetOverlappedResult",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpcbTransfer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "InOut"
+        },
+        {
+          "name": "fWait",
+          "type": {
+            "Primitive": "Bool"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwFlags",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSAGetServiceClassInfo",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpProviderId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpServiceClassId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpServiceClassInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAGetServiceClassNameByClassId",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpServiceClassId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpszServiceClassName",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAHtonl",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hostlong",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpnetlong",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAHtons",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "hostshort",
+          "type": {
+            "Primitive": "UInt16"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpnetshort",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt16"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAInstallServiceClass",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpServiceClassInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAIoctl",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwIoControlCode",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpvInBuffer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "cbInBuffer"
+              }
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "cbInBuffer",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpvOutBuffer",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "lpcbBytesReturned"
+              }
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "cbOutBuffer",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpcbBytesReturned",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAJoinLeaf",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "name",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "namelen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCallerData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCalleeData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpSQOS",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpGQOS",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSALookupServiceBegin",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpqsRestrictions",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwControlFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lphLookup",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSALookupServiceEnd",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hLookup",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSALookupServiceNext",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hLookup",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwControlFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpdwBufferLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpqsResults",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSANtohl",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "netlong",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lphostlong",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSANtohs",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "netshort",
+          "type": {
+            "Primitive": "UInt16"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lphostshort",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt16"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAPoll",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "nfds",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "timeout",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAProviderConfigChange",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpNotificationHandle",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSARecv",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpBuffers",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwBufferCount",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNumberOfBytesRecvd",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpFlags",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSARecvDisconnect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpInboundDisconnectData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSARecvFrom",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpBuffers",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwBufferCount",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNumberOfBytesRecvd",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpFlags",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpFrom",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpFromlen",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSARemoveServiceClass",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpServiceClassId",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAResetEvent",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hEvent",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSASend",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpBuffers",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwBufferCount",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNumberOfBytesSent",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSASendDisconnect",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOutboundDisconnectData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSASendMsg",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpMsg",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNumberOfBytesSent",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSASendTo",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpBuffers",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwBufferCount",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpNumberOfBytesSent",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "UInt32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpTo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "iToLen",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpCompletionRoutine",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "Out"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSASetEvent",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "hEvent",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "WSASetLastError",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "iError",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Void"
+      }
+    },
+    {
+      "name": "WSASetService",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpqsRegInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "essOperation",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwControlFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSASocket",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "af",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "type",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "protocol",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpProtocolInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "g",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwFlags",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Handle"
+      }
+    },
+    {
+      "name": "WSAStartup",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "wVersionRequested",
+          "type": {
+            "Primitive": "UInt16"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpWSAData",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "WSAStringToAddress",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "AddressString",
+          "type": {
+            "String": {
+              "encoding": "Unicode",
+              "max_length": 260
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "AddressFamily",
+          "type": {
+            "Primitive": "Int32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpProtocolInfo",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true,
+              "size_hint": {
+                "ParamName": "lpAddressLength"
+              }
+            }
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "lpAddress",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpAddressLength",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Int32"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Int32"
+      }
+    },
+    {
+      "name": "WSAWaitForMultipleEvents",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "cEvents",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lphEvents",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "fWaitAll",
+          "type": {
+            "Primitive": "Bool"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "dwTimeout",
+          "type": {
+            "Primitive": "UInt32"
+          },
+          "direction": "Out"
+        },
+        {
+          "name": "fAlertable",
+          "type": {
+            "Primitive": "Bool"
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "WSAIsBlocking",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    },
+    {
+      "name": "GetAddrInfoExCancel",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpHandle",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Handle"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "GetAddrInfoExOverlappedResult",
+      "module": "Ws2_32.dll",
+      "category": "Windows Sockets 2",
+      "params": [
+        {
+          "name": "lpOverlapped",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "UInt32"
+      }
+    },
+    {
+      "name": "WSAGetQOSByName",
+      "module": "Ws2_32.dll",
+      "category": "Quality of Service (QOS)",
+      "params": [
+        {
+          "name": "s",
+          "type": {
+            "Primitive": "Handle"
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpQOSName",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        },
+        {
+          "name": "lpQOS",
+          "type": {
+            "Pointer": {
+              "inner": {
+                "Primitive": "Void"
+              },
+              "nullable": true
+            }
+          },
+          "direction": "In"
+        }
+      ],
+      "return_type": {
+        "Primitive": "Bool"
+      }
+    }
+  ],
+  "structs": [],
+  "enums": [
+    {
+      "name": "LookupServiceFlags",
+      "base_type": "UInt32",
+      "is_flags": true,
+      "values": [
+        {
+          "name": "LUP_DEEP",
+          "value": 1
+        },
+        {
+          "name": "LUP_CONTAINERS",
+          "value": 2
+        },
+        {
+          "name": "LUP_NOCONTAINERS",
+          "value": 4
+        },
+        {
+          "name": "LUP_NEAREST",
+          "value": 8
+        },
+        {
+          "name": "LUP_RETURN_NAME",
+          "value": 16
+        },
+        {
+          "name": "LUP_RETURN_TYPE",
+          "value": 32
+        },
+        {
+          "name": "LUP_RETURN_VERSION",
+          "value": 64
+        },
+        {
+          "name": "LUP_RETURN_COMMENT",
+          "value": 128
+        },
+        {
+          "name": "LUP_RETURN_ADDR",
+          "value": 256
+        },
+        {
+          "name": "LUP_RETURN_BLOB",
+          "value": 512
+        },
+        {
+          "name": "LUP_RETURN_ALIASES",
+          "value": 1024
+        },
+        {
+          "name": "LUP_RETURN_QUERY_STRING",
+          "value": 2048
+        },
+        {
+          "name": "LUP_RETURN_ALL",
+          "value": 4080
+        },
+        {
+          "name": "LUP_RES_SERVICE",
+          "value": 32768
+        },
+        {
+          "name": "LUP_FLUSHCACHE",
+          "value": 4096
+        },
+        {
+          "name": "LUP_FLUSHPREVIOUS",
+          "value": 8192
+        },
+        {
+          "name": "LUP_NON_AUTHORITATIVE",
+          "value": 16384
+        },
+        {
+          "name": "LUP_SECURE",
+          "value": 32768
+        },
+        {
+          "name": "LUP_RETURN_PREFERRED_NAMES",
+          "value": 65536
+        },
+        {
+          "name": "LUP_ADDRCONFIG",
+          "value": 1048576
+        },
+        {
+          "name": "LUP_DUAL_ADDR",
+          "value": 2097152
+        }
+      ]
+    },
+    {
+      "name": "WsaFlags",
+      "base_type": "UInt32",
+      "is_flags": true,
+      "values": [
+        {
+          "name": "WSA_FLAG_OVERLAPPED",
+          "value": 1
+        },
+        {
+          "name": "WSA_FLAG_MULTIPOINT_C_ROOT",
+          "value": 2
+        },
+        {
+          "name": "WSA_FLAG_MULTIPOINT_C_LEAF",
+          "value": 4
+        },
+        {
+          "name": "WSA_FLAG_MULTIPOINT_D_ROOT",
+          "value": 8
+        },
+        {
+          "name": "WSA_FLAG_MULTIPOINT_D_LEAF",
+          "value": 16
+        },
+        {
+          "name": "WSA_FLAG_ACCESS_SYSTEM_SECURITY",
+          "value": 64
+        }
+      ]
+    },
+    {
+      "name": "WsaIoctl",
+      "base_type": "UInt32",
+      "is_flags": false,
+      "values": [
+        {
+          "name": "SIO_ASSOCIATE_HANDLE",
+          "value": 2281701377
+        },
+        {
+          "name": "SIO_ENABLE_CIRCULAR_QUEUEING",
+          "value": 671088642
+        },
+        {
+          "name": "SIO_FIND_ROUTE",
+          "value": 1207959555
+        },
+        {
+          "name": "SIO_FLUSH",
+          "value": 671088644
+        },
+        {
+          "name": "SIO_GET_BROADCAST_ADDRESS",
+          "value": 1207959557
+        },
+        {
+          "name": "SIO_GET_EXTENSION_FUNCTION_POINTER",
+          "value": 3355443206
+        },
+        {
+          "name": "SIO_GET_QOS",
+          "value": 3355443207
+        },
+        {
+          "name": "SIO_GET_GROUP_QOS",
+          "value": 3355443208
+        },
+        {
+          "name": "SIO_MULTIPOINT_LOOPBACK",
+          "value": 2281701385
+        },
+        {
+          "name": "SIO_MULTICAST_SCOPE",
+          "value": 2281701386
+        },
+        {
+          "name": "SIO_SET_QOS",
+          "value": 2281701387
+        },
+        {
+          "name": "SIO_SET_GROUP_QOS",
+          "value": 2281701388
+        },
+        {
+          "name": "SIO_TRANSLATE_HANDLE",
+          "value": 3355443213
+        },
+        {
+          "name": "SIO_ROUTING_INTERFACE_QUERY",
+          "value": 3355443220
+        },
+        {
+          "name": "SIO_ROUTING_INTERFACE_CHANGE",
+          "value": 2281701397
+        },
+        {
+          "name": "SIO_ADDRESS_LIST_QUERY",
+          "value": 1207959574
+        },
+        {
+          "name": "SIO_ADDRESS_LIST_CHANGE",
+          "value": 671088663
+        },
+        {
+          "name": "SIO_QUERY_TARGET_PNP_HANDLE",
+          "value": 1207959576
+        },
+        {
+          "name": "SIO_ADDRESS_LIST_SORT",
+          "value": 3355443225
+        },
+        {
+          "name": "SIO_RESERVED_1",
+          "value": 2281701402
+        },
+        {
+          "name": "SIO_RESERVED_2",
+          "value": 2281701409
+        }
+      ]
+    }
+  ]
+}

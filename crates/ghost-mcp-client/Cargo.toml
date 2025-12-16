@@ -1,0 +1,17 @@
+[package]
+name = "ghost-mcp-client"
+version.workspace = true
+edition = "2021"
+description = "CLI MCP client for testing Ghost-MCP"
+
+[[bin]]
+name = "ghost-client"
+path = "src/main.rs"
+
+[dependencies]
+ghost-common = { path = "../ghost-common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"

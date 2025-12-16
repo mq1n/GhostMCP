@@ -1,0 +1,2870 @@
+[
+  {
+    "name": "agent_status",
+    "description": "Get the status of the ghost-agent connection",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "agent_reconnect",
+    "description": "Disconnect and reconnect to the ghost-agent (use after rebuilding agent DLL)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "memory_read",
+    "description": "Read bytes from a memory address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Memory address" },
+        "size": { "type": "integer", "description": "Bytes to read" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "module_list",
+    "description": "List loaded modules",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "memory_regions",
+    "description": "List all memory regions with protection flags",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "memory_write",
+    "description": "Write bytes to a memory address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Memory address" },
+        "bytes": { "type": "string", "description": "Hex-encoded bytes to write" }
+      },
+      "required": ["address", "bytes"]
+    }
+  },
+  {
+    "name": "memory_search",
+    "description": "Search memory for an exact value",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string", "description": "Value to search for" },
+        "type": { "type": "string", "description": "Value type: u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, string", "default": "i32" },
+        "start": { "type": "integer", "description": "Start address (optional)" },
+        "end": { "type": "integer", "description": "End address (optional)" }
+      },
+      "required": ["value"]
+    }
+  },
+  {
+    "name": "memory_search_pattern",
+    "description": "Search memory for an AOB pattern with wildcards",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pattern": { "type": "string", "description": "AOB pattern, e.g. '48 8B ?? 00 FF'" }
+      },
+      "required": ["pattern"]
+    }
+  },
+  {
+    "name": "disasm_at",
+    "description": "Disassemble instructions at address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Memory address to disassemble" },
+        "count": { "type": "integer", "description": "Number of instructions (default 10, max 100)", "default": 10 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "assemble",
+    "description": "Assemble x86/x64 instructions to machine code bytes using iced-x86",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Assembly code (one instruction per line or semicolon-separated)" },
+        "address": { "type": "string", "description": "Target address for position-dependent code (hex, default 0)" },
+        "mode": { "type": "string", "description": "Assembly mode: x64 (default) or x86", "default": "x64" }
+      },
+      "required": ["code"]
+    }
+  },
+  {
+    "name": "assemble_shellcode",
+    "description": "Generate shellcode for calling a function with arguments (x64 Windows ABI)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "function_address": { "type": "string", "description": "Target function address (hex)" },
+        "args": { "type": "array", "items": { "type": "string" }, "description": "Function arguments (hex values)" }
+      },
+      "required": ["function_address"]
+    }
+  },
+  {
+    "name": "disasm_function",
+    "description": "Disassemble a function starting at address (stops at RET)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function start address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "decompile",
+    "description": "Decompile a function to pseudo-C code (Hex-Rays style)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function start address to decompile" },
+        "name": { "type": "string", "description": "Optional function name for the output" },
+        "style": { "type": "string", "description": "Output style: 'c' (default), 'simplified', 'verbose'", "default": "c" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "module_exports",
+    "description": "List exports from a module",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name (e.g. 'kernel32.dll')" }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "module_imports",
+    "description": "List imports of a module",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name (e.g. 'game.exe')" }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "string_list",
+    "description": "Extract strings from a module",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name" },
+        "min_length": { "type": "integer", "description": "Minimum string length (default 4)", "default": 4 }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "symbol_resolve",
+    "description": "Resolve symbol name to address (e.g. 'kernel32!CreateFileW' or 'CreateFileW')",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Symbol name, optionally with module prefix" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "xref_to",
+    "description": "Find cross-references TO an address (who calls/references this address)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Target address to find references to" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "thread_list",
+    "description": "List all threads in the target process",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "thread_registers",
+    "description": "Get CPU registers for a thread",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "thread_suspend",
+    "description": "Suspend a thread",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID to suspend" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "thread_resume",
+    "description": "Resume a suspended thread",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID to resume" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "breakpoint_set",
+    "description": "Set a breakpoint at an address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Memory address for breakpoint" },
+        "type": { "type": "string", "description": "Breakpoint type: software (INT3, default) or hardware (DR0-DR3)", "default": "software" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "breakpoint_remove",
+    "description": "Remove a breakpoint by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Breakpoint ID to remove" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "breakpoint_list",
+    "description": "List all active breakpoints",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "breakpoint_enable",
+    "description": "Enable or disable a breakpoint",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Breakpoint ID" },
+        "enabled": { "type": "boolean", "description": "Enable (true) or disable (false)" }
+      },
+      "required": ["id", "enabled"]
+    }
+  },
+  {
+    "name": "execution_continue",
+    "description": "Continue execution after a breakpoint hit",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "execution_step_into",
+    "description": "Single-step one instruction (step into calls)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID to step" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "stack_walk",
+    "description": "Walk the call stack for a thread with symbol resolution",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "action_last",
+    "description": "Get details of the last executed action",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "action_verify",
+    "description": "Verify the last action completed as expected",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expect_success": { "type": "boolean", "description": "Expect success (default true)", "default": true },
+        "expect_tool": { "type": "string", "description": "Expected tool name (optional)" },
+        "contains": { "type": "string", "description": "Text that result should contain (optional)" }
+      }
+    }
+  },
+  {
+    "name": "script_load",
+    "description": "Load a script from file or inline code",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to script file (optional if code provided)" },
+        "code": { "type": "string", "description": "Inline script code (optional if path provided)" },
+        "name": { "type": "string", "description": "Script name (optional, defaults to filename)" }
+      }
+    }
+  },
+  {
+    "name": "script_unload",
+    "description": "Unload a script by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Script ID to unload" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "script_reload",
+    "description": "Hot-reload a script (unload and reload from source)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Script ID to reload" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "script_list",
+    "description": "List all loaded scripts with their status",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "script_status",
+    "description": "Get detailed status of a specific script",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Script ID" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "hook_create",
+    "description": "Create a hook at an address with Frida-style callbacks",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address to hook" },
+        "script_id": { "type": "integer", "description": "Script ID that owns this hook" },
+        "on_enter": { "type": "string", "description": "onEnter callback code (access args, registers)" },
+        "on_leave": { "type": "string", "description": "onLeave callback code (access/modify return value)" },
+        "on_exception": { "type": "string", "description": "onException callback code" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "hook_remove",
+    "description": "Remove a hook by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Hook ID to remove" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "hook_enable",
+    "description": "Enable or disable a hook",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Hook ID" },
+        "enabled": { "type": "boolean", "description": "Enable (true) or disable (false)" }
+      },
+      "required": ["id", "enabled"]
+    }
+  },
+  {
+    "name": "hook_list",
+    "description": "List all active hooks",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "script_id": { "type": "integer", "description": "Filter by script ID (optional)" }
+      }
+    }
+  },
+  {
+    "name": "rpc_list",
+    "description": "List all exported RPC functions from scripts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "script_id": { "type": "integer", "description": "Filter by script ID (optional)" }
+      }
+    }
+  },
+  {
+    "name": "rpc_call",
+    "description": "Call an RPC function exported by a script",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "RPC function name" },
+        "args": { "type": "array", "description": "Arguments to pass to the function" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "mcp_capabilities",
+    "description": "List all available tools organized by category",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "description": "Filter by category (optional): memory, module, debug, disasm, script, session, process, meta" }
+      }
+    }
+  },
+  {
+    "name": "mcp_documentation",
+    "description": "Get detailed documentation and examples for a tool",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tool": { "type": "string", "description": "Tool name to get documentation for" }
+      },
+      "required": ["tool"]
+    }
+  },
+  {
+    "name": "mcp_version",
+    "description": "Get server version and build information",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "mcp_health",
+    "description": "Check health of all components (agent, script engine, IPC)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "session_info",
+    "description": "Get current session status (attached process, mode, stats)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "session_attach",
+    "description": "Attach to a process by name or PID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID to attach to" },
+        "name": { "type": "string", "description": "Process name to attach to (alternative to pid)" }
+      }
+    }
+  },
+  {
+    "name": "session_detach",
+    "description": "Detach from the current process",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "process_list",
+    "description": "List running processes with optional filter",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter by process name (substring match)" },
+        "arch": { "type": "string", "description": "Filter by architecture: x86, x64" }
+      }
+    }
+  },
+  {
+    "name": "process_spawn",
+    "description": "Spawn a new process (optionally suspended for early injection)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to executable" },
+        "args": { "type": "array", "description": "Command line arguments", "items": { "type": "string" } },
+        "working_dir": { "type": "string", "description": "Working directory" },
+        "suspended": { "type": "boolean", "description": "Start suspended (for early injection)", "default": false },
+        "inject": { "type": "boolean", "description": "Inject agent after spawn", "default": true }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "process_resume",
+    "description": "Resume a suspended process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID to resume" }
+      },
+      "required": ["pid"]
+    }
+  },
+  {
+    "name": "process_terminate",
+    "description": "Terminate a process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID to terminate" },
+        "force": { "type": "boolean", "description": "Force termination (TerminateProcess)", "default": false }
+      },
+      "required": ["pid"]
+    }
+  },
+  {
+    "name": "scan_new",
+    "description": "Create a new scan session with specified options. Returns a scan_id for subsequent operations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "value_type": { "type": "string", "description": "Value type: u8, u16, u32, u64, i8, i16, i32 (default), i64, f32, f64, string", "default": "i32" },
+        "compare": { "type": "string", "description": "Compare type: exact (default), unknown, between, greater, less, fuzzy", "default": "exact" },
+        "alignment": { "type": "integer", "description": "Custom alignment (default: auto based on type)" },
+        "fast_scan": { "type": "boolean", "description": "Fast scan mode (skip by alignment)", "default": true },
+        "max_results": { "type": "integer", "description": "Maximum results to return", "default": 100000 },
+        "tolerance": { "type": "number", "description": "Tolerance for fuzzy scans (0.1 = 10%)", "default": 0 },
+        "min": { "type": "string", "description": "Minimum value for between scans" },
+        "max": { "type": "string", "description": "Maximum value for between scans" },
+        "filter": {
+          "type": "object",
+          "description": "Region filter options",
+          "properties": {
+            "writable": { "type": "boolean", "description": "Only scan writable regions" },
+            "executable": { "type": "boolean", "description": "Only scan executable regions" },
+            "module_only": { "type": "boolean", "description": "Only scan module regions" },
+            "module": { "type": "string", "description": "Specific module to scan" },
+            "start": { "type": "integer", "description": "Start address" },
+            "end": { "type": "integer", "description": "End address" }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "scan_first",
+    "description": "Perform the initial scan to find all matching values. Use after scan_new.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID from scan_new" },
+        "value": { "type": "string", "description": "Value to search for (not required for unknown initial scan)" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "scan_next",
+    "description": "Perform iterative scan to filter existing results based on comparison",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "compare": { "type": "string", "description": "Compare type: exact, changed, unchanged, increased, decreased, greater, less, sameasfirst, sameasprevious, fuzzy" },
+        "value": { "type": "string", "description": "Value for exact/greater/less comparisons (optional for changed/unchanged/increased/decreased)" }
+      },
+      "required": ["scan_id", "compare"]
+    }
+  },
+  {
+    "name": "scan_results",
+    "description": "Get scan results with pagination",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "offset": { "type": "integer", "description": "Start offset", "default": 0 },
+        "limit": { "type": "integer", "description": "Maximum results to return", "default": 100 }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "scan_count",
+    "description": "Get the current result count for a scan session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "scan_progress",
+    "description": "Get real-time progress of the current scan operation",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "scan_cancel",
+    "description": "Cancel the current scan operation",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "scan_close",
+    "description": "Close a scan session and free resources",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID to close" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "scan_list",
+    "description": "List all active scan sessions",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "scan_export",
+    "description": "Export scan results to JSON, CSV, or Cheat Engine XML format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "format": { "type": "string", "description": "Export format: json (default), csv, xml", "default": "json" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "scan_import",
+    "description": "Import scan results from JSON data",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "data": { "type": "string", "description": "JSON data to import" }
+      },
+      "required": ["scan_id", "data"]
+    }
+  },
+  {
+    "name": "r2_session",
+    "description": "Open or close a Radare2 session (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "Session action: open or close" },
+        "path": { "type": "string", "description": "Path to the binary file to analyze (required for open)" }
+      },
+      "required": ["action"]
+    }
+  },
+  {
+    "name": "r2_open",
+    "description": "Open a binary file with Radare2 for static analysis (requires radare2 installed)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to the binary file to analyze" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "r2_close",
+    "description": "Close the current Radare2 session",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "r2_status",
+    "description": "Get the status of the Radare2 backend connection",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "r2_info",
+    "description": "Get binary information (architecture, format, entry point, sections)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "r2_functions",
+    "description": "List all functions detected in the binary",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter functions by name (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum functions to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "r2_function",
+    "description": "Get detailed information about a specific function",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address" },
+        "name": { "type": "string", "description": "Function name (alternative to address)" }
+      }
+    }
+  },
+  {
+    "name": "r2_disasm",
+    "description": "Disassemble instructions at an address using Radare2",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Address to disassemble" },
+        "count": { "type": "integer", "description": "Number of instructions (default 20)", "default": 20 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_disasm_function",
+    "description": "Disassemble an entire function using Radare2",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address to disassemble" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_decompile",
+    "description": "Decompile a function to pseudo-C (requires r2ghidra or r2dec plugin)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address to decompile" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_strings",
+    "description": "List strings found in the binary",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "min_length": { "type": "integer", "description": "Minimum string length (default 4)", "default": 4 },
+        "filter": { "type": "string", "description": "Filter strings by content (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum strings to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "r2_imports",
+    "description": "List imported functions/symbols",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter imports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "r2_exports",
+    "description": "List exported functions/symbols",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter exports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "r2_xref",
+    "description": "Get cross-references to or from an address (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Address to query" },
+        "direction": { "type": "string", "description": "Direction: to (default) or from", "default": "to" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_xrefs_to",
+    "description": "Get cross-references TO an address (who calls/references this)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_xrefs_from",
+    "description": "Get cross-references FROM an address (what does this call/reference)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Source address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_read",
+    "description": "Read bytes from the binary at an address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Address to read from" },
+        "size": { "type": "integer", "description": "Number of bytes to read (default 64)", "default": 64 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "r2_cmd",
+    "description": "Execute a raw Radare2 command (advanced users)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "description": "Radare2 command to execute" }
+      },
+      "required": ["command"]
+    }
+  },
+  {
+    "name": "ida_session",
+    "description": "Open or close an IDA Pro session (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "Session action: open or close" },
+        "path": { "type": "string", "description": "Path to binary or .idb file (required for open)" }
+      },
+      "required": ["action"]
+    }
+  },
+  {
+    "name": "ida_open",
+    "description": "Open a binary/IDB file with IDA Pro for static analysis (requires IDA v9.x)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to binary or .idb file" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "ida_close",
+    "description": "Close the current IDA session",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ida_status",
+    "description": "Get the status of the IDA backend connection",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ida_info",
+    "description": "Get binary information from IDA (architecture, segments, entry point)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ida_functions",
+    "description": "List all functions detected by IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter functions by name (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum functions to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "ida_function",
+    "description": "Get detailed information about a specific function in IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address" },
+        "name": { "type": "string", "description": "Function name (alternative to address)" }
+      }
+    }
+  },
+  {
+    "name": "ida_disasm",
+    "description": "Disassemble instructions at an address using IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Address to disassemble" },
+        "count": { "type": "integer", "description": "Number of instructions (default 20)", "default": 20 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ida_decompile",
+    "description": "Decompile a function using Hex-Rays (requires Hex-Rays license)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address to decompile" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ida_strings",
+    "description": "List strings found by IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "min_length": { "type": "integer", "description": "Minimum string length (default 4)", "default": 4 },
+        "filter": { "type": "string", "description": "Filter strings by content (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum strings to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "ida_imports",
+    "description": "List imported functions from IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter imports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "ida_exports",
+    "description": "List exported functions from IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter exports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "ida_xref",
+    "description": "Get cross-references to or from an address in IDA (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address" },
+        "direction": { "type": "string", "description": "Direction: to (default) or from", "default": "to" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ida_xrefs_to",
+    "description": "Get cross-references TO an address in IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ida_xrefs_from",
+    "description": "Get cross-references FROM an address in IDA",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Source address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ghidra_session",
+    "description": "Open or close a Ghidra session (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "Session action: open or close" },
+        "path": { "type": "string", "description": "Path to the binary file to analyze (required for open)" }
+      },
+      "required": ["action"]
+    }
+  },
+  {
+    "name": "ghidra_open",
+    "description": "Open a binary file with Ghidra for static analysis (Linux/macOS only)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to the binary file to analyze" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "ghidra_close",
+    "description": "Close the current Ghidra session",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ghidra_status",
+    "description": "Get the status of the Ghidra backend connection",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ghidra_info",
+    "description": "Get binary information from Ghidra (architecture, memory blocks, entry point)",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ghidra_functions",
+    "description": "List all functions detected by Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter functions by name (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum functions to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "ghidra_function",
+    "description": "Get detailed information about a specific function in Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address" },
+        "name": { "type": "string", "description": "Function name (alternative to address)" }
+      }
+    }
+  },
+  {
+    "name": "ghidra_disasm",
+    "description": "Disassemble instructions at an address using Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Address to disassemble" },
+        "count": { "type": "integer", "description": "Number of instructions (default 20)", "default": 20 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ghidra_decompile",
+    "description": "Decompile a function using Ghidra's decompiler",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Function address to decompile" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ghidra_strings",
+    "description": "List strings found by Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "min_length": { "type": "integer", "description": "Minimum string length (default 4)", "default": 4 },
+        "filter": { "type": "string", "description": "Filter strings by content (substring match)" },
+        "limit": { "type": "integer", "description": "Maximum strings to return (default 100)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "ghidra_imports",
+    "description": "List imported functions from Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter imports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "ghidra_exports",
+    "description": "List exported functions from Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter exports by name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "ghidra_xref",
+    "description": "Get cross-references to or from an address in Ghidra (consolidated API)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address" },
+        "direction": { "type": "string", "description": "Direction: to (default) or from", "default": "to" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ghidra_xrefs_to",
+    "description": "Get cross-references TO an address in Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Target address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ghidra_xrefs_from",
+    "description": "Get cross-references FROM an address in Ghidra",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "integer", "description": "Source address" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "exec_resolve",
+    "description": "Resolve a function address by module and function name (GetProcAddress)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name (e.g., 'kernel32.dll', 'ntdll.dll')" },
+        "function": { "type": "string", "description": "Function name to resolve (e.g., 'CreateFileW')" }
+      },
+      "required": ["module", "function"]
+    }
+  },
+  {
+    "name": "exec_call",
+    "description": "Call a function at an address with arguments. Supports various calling conventions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Function address (hex or decimal)" },
+        "args": { "type": "array", "description": "Arguments to pass (integers, pointers, or strings)", "items": { "type": ["integer", "string"] } },
+        "convention": { "type": "string", "description": "Calling convention: win64 (default), cdecl, stdcall, fastcall, thiscall", "default": "win64" },
+        "new_thread": { "type": "boolean", "description": "Execute in a new thread", "default": false },
+        "timeout_ms": { "type": "integer", "description": "Timeout in milliseconds (0 = no timeout)", "default": 0 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "exec_call_api",
+    "description": "Call a Windows API function by name (resolves and calls in one step)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name (e.g., 'kernel32.dll')" },
+        "function": { "type": "string", "description": "Function name (e.g., 'GetCurrentProcessId')" },
+        "args": { "type": "array", "description": "Arguments to pass", "items": { "type": ["integer", "string"] } }
+      },
+      "required": ["module", "function"]
+    }
+  },
+  {
+    "name": "exec_shellcode",
+    "description": "Execute shellcode in the target process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "shellcode": { "type": "string", "description": "Hex-encoded shellcode bytes (e.g., '48 31 C0 C3')" },
+        "method": { "type": "string", "description": "Execution method: current, thread, ntcreate, apc, hijack", "default": "current" },
+        "wait": { "type": "boolean", "description": "Wait for completion", "default": true },
+        "timeout_ms": { "type": "integer", "description": "Timeout in milliseconds", "default": 30000 },
+        "parameter": { "type": "integer", "description": "Parameter to pass to shellcode (in RCX)" },
+        "free_after": { "type": "boolean", "description": "Free shellcode memory after execution", "default": true }
+      },
+      "required": ["shellcode"]
+    }
+  },
+  {
+    "name": "exec_alloc",
+    "description": "Allocate executable memory in the target process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "size": { "type": "integer", "description": "Size in bytes to allocate" },
+        "protection": { "type": "string", "description": "Memory protection: rwx (default), rw, rx", "default": "rwx" }
+      },
+      "required": ["size"]
+    }
+  },
+  {
+    "name": "exec_free",
+    "description": "Free previously allocated memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Address of memory to free" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "exec_write",
+    "description": "Write data to executable memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Target address" },
+        "data": { "type": "string", "description": "Hex-encoded data to write" }
+      },
+      "required": ["address", "data"]
+    }
+  },
+  {
+    "name": "cave_find",
+    "description": "Find code caves (unused executable space) in memory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "min_size": { "type": "integer", "description": "Minimum cave size in bytes", "default": 64 },
+        "module": { "type": "string", "description": "Specific module to search in (optional)" },
+        "executable_only": { "type": "boolean", "description": "Only search executable regions", "default": true },
+        "max_results": { "type": "integer", "description": "Maximum caves to return", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "cave_alloc",
+    "description": "Allocate and reserve a code cave for use",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Cave address to allocate" },
+        "size": { "type": "integer", "description": "Size of the cave" },
+        "description": { "type": "string", "description": "Optional description/purpose" }
+      },
+      "required": ["address", "size"]
+    }
+  },
+  {
+    "name": "cave_free",
+    "description": "Free a previously allocated code cave",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Cave ID to free" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "cave_list",
+    "description": "List all allocated code caves",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "syscall_number",
+    "description": "Get the syscall number for an ntdll function",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "function": { "type": "string", "description": "Ntdll function name (e.g., 'NtQueryInformationProcess')" }
+      },
+      "required": ["function"]
+    }
+  },
+  {
+    "name": "syscall_invoke",
+    "description": "Invoke a syscall directly (bypasses user-mode hooks)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer", "description": "Syscall number" },
+        "args": { "type": "array", "description": "Syscall arguments", "items": { "type": "integer" } }
+      },
+      "required": ["number"]
+    }
+  },
+  {
+    "name": "remote_thread",
+    "description": "Create a remote thread in another process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Target process ID" },
+        "address": { "type": "string", "description": "Start address for the thread" },
+        "parameter": { "type": "integer", "description": "Parameter to pass to thread" },
+        "wait": { "type": "boolean", "description": "Wait for thread completion", "default": false }
+      },
+      "required": ["pid", "address"]
+    }
+  },
+  {
+    "name": "remote_apc",
+    "description": "Queue an APC to a thread in another process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Target process ID" },
+        "tid": { "type": "integer", "description": "Target thread ID" },
+        "address": { "type": "string", "description": "APC function address" },
+        "parameter": { "type": "integer", "description": "Parameter to pass to APC" }
+      },
+      "required": ["pid", "tid", "address"]
+    }
+  },
+  {
+    "name": "command_batch",
+    "description": "Execute multiple commands as a batch sequence with optional conditions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Batch sequence name" },
+        "commands": {
+          "type": "array",
+          "description": "Array of commands to execute",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tool": { "type": "string", "description": "Tool name to execute" },
+              "arguments": { "type": "object", "description": "Tool arguments" },
+              "label": { "type": "string", "description": "Optional label for referencing in conditions" },
+              "condition": { "type": "string", "description": "Condition: always, previous_success, previous_failed, label:name:success, label:name:failed" },
+              "continue_on_error": { "type": "boolean", "description": "Continue sequence on error", "default": false }
+            },
+            "required": ["tool"]
+          }
+        },
+        "transactional": { "type": "boolean", "description": "Rollback on failure (where possible)", "default": false },
+        "timeout_ms": { "type": "integer", "description": "Maximum total execution time in ms", "default": 0 }
+      },
+      "required": ["commands"]
+    }
+  },
+  {
+    "name": "command_history",
+    "description": "Query command execution history",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tool": { "type": "string", "description": "Filter by tool name" },
+        "success": { "type": "boolean", "description": "Filter by success/failure" },
+        "limit": { "type": "integer", "description": "Maximum entries to return", "default": 50 },
+        "offset": { "type": "integer", "description": "Offset for pagination", "default": 0 }
+      }
+    }
+  },
+  {
+    "name": "command_replay",
+    "description": "Replay a command from history by ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Command history entry ID to replay" },
+        "modify_args": { "type": "object", "description": "Arguments to override from original" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "event_subscribe",
+    "description": "Subscribe to agent events (breakpoints, exceptions, memory changes, hooks)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "description": "Event types to subscribe: all, breakpoint, exception, memory_change, hook_trigger, state_change, module, custom",
+          "items": { "type": "string" },
+          "default": ["all"]
+        },
+        "buffer_size": { "type": "integer", "description": "Maximum events to buffer (0 = unlimited)", "default": 100 }
+      }
+    }
+  },
+  {
+    "name": "event_unsubscribe",
+    "description": "Unsubscribe from events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": { "type": "integer", "description": "Subscription ID to cancel" }
+      },
+      "required": ["subscription_id"]
+    }
+  },
+  {
+    "name": "event_poll",
+    "description": "Poll for buffered events from a subscription",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subscription_id": { "type": "integer", "description": "Subscription ID to poll" },
+        "limit": { "type": "integer", "description": "Maximum events to return", "default": 50 },
+        "clear": { "type": "boolean", "description": "Clear events after reading", "default": true }
+      },
+      "required": ["subscription_id"]
+    }
+  },
+  {
+    "name": "event_list",
+    "description": "List active event subscriptions",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ai_summarize",
+    "description": "Generate an AI-friendly summary of the last operation or specified data",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "data": { "type": "object", "description": "Data to summarize (if not provided, summarizes last action)" },
+        "context": { "type": "string", "description": "Context hint for summarization (e.g., 'vulnerability analysis', 'game hacking')" }
+      }
+    }
+  },
+  {
+    "name": "ai_diff",
+    "description": "Generate a diff report comparing two states",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Diff type: memory, registers, modules, threads, breakpoints, hooks, scan_results" },
+        "before": { "type": "object", "description": "Previous state (or use snapshot_id)" },
+        "after": { "type": "object", "description": "Current state (or omit to use live state)" },
+        "before_snapshot": { "type": "integer", "description": "Snapshot ID for before state" },
+        "after_snapshot": { "type": "integer", "description": "Snapshot ID for after state" }
+      },
+      "required": ["type"]
+    }
+  },
+  {
+    "name": "ai_explain_error",
+    "description": "Get a detailed AI-friendly explanation of an error",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "error": { "type": "string", "description": "Error message or code to explain" },
+        "context": { "type": "string", "description": "Additional context about what operation failed" }
+      },
+      "required": ["error"]
+    }
+  },
+  {
+    "name": "debug_session_create",
+    "description": "Create a new AI-assisted debugging session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Session name/description" },
+        "goal": { "type": "string", "description": "Debugging goal (e.g., 'Find health value', 'Analyze anti-cheat')" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "debug_session_info",
+    "description": "Get current debugging session state and findings",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID (omit for current session)" }
+      }
+    }
+  },
+  {
+    "name": "debug_session_update",
+    "description": "Update the debugging session with new findings or hypotheses",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" },
+        "finding": {
+          "type": "object",
+          "description": "New finding to add",
+          "properties": {
+            "type": { "type": "string", "description": "Finding type: vulnerability, interesting_function, anti_debug, crypto, network, file_op, registry_op, memory_pattern, control_flow, custom" },
+            "description": { "type": "string" },
+            "details": { "type": "object" },
+            "addresses": { "type": "array", "items": { "type": "integer" } },
+            "confidence": { "type": "number" }
+          }
+        },
+        "hypothesis": {
+          "type": "object",
+          "description": "New hypothesis to add",
+          "properties": {
+            "description": { "type": "string" },
+            "tests": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "context": { "type": "object", "description": "Key-value context to store" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "debug_session_close",
+    "description": "Close a debugging session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID to close" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "debug_session_list",
+    "description": "List all debugging sessions",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "ai_recommend_breakpoints",
+    "description": "Get AI recommendations for breakpoint locations based on analysis goal",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "goal": { "type": "string", "description": "What you're trying to find/analyze" },
+        "module": { "type": "string", "description": "Target module to analyze" },
+        "limit": { "type": "integer", "description": "Maximum recommendations", "default": 10 }
+      },
+      "required": ["goal"]
+    }
+  },
+  {
+    "name": "ai_analyze_vulnerability",
+    "description": "Analyze a code location for potential vulnerabilities",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Address to analyze" },
+        "context_size": { "type": "integer", "description": "Number of instructions to analyze around address", "default": 50 }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "ai_learn_pattern",
+    "description": "Learn and save a pattern from user actions for future reference",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Pattern name" },
+        "description": { "type": "string", "description": "Pattern description" },
+        "type": { "type": "string", "description": "Pattern type: code_sequence, memory_layout, behavior, data_structure, user_action" },
+        "data": { "type": "object", "description": "Pattern data (signature, behavior definition, etc.)" }
+      },
+      "required": ["name", "type", "data"]
+    }
+  },
+  {
+    "name": "ai_patterns_list",
+    "description": "List learned patterns",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Filter by pattern type" }
+      }
+    }
+  },
+  {
+    "name": "dump_create",
+    "description": "Create a memory dump of the target process",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Dump type: full (default), region, module, minidump", "default": "full" },
+        "start": { "type": "integer", "description": "Start address (for region dumps)" },
+        "end": { "type": "integer", "description": "End address (for region dumps)" },
+        "module": { "type": "string", "description": "Module name (for module dumps)" },
+        "output": { "type": "string", "description": "Output file path (optional, returns data if not specified)" },
+        "reconstruct_pe": { "type": "boolean", "description": "Reconstruct PE structure for module dumps", "default": false },
+        "compress": { "type": "boolean", "description": "Compress the dump", "default": false }
+      }
+    }
+  },
+  {
+    "name": "dump_region",
+    "description": "Dump a specific memory region",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "start": { "type": "integer", "description": "Start address of region" },
+        "end": { "type": "integer", "description": "End address of region" },
+        "output": { "type": "string", "description": "Output file path (optional)" }
+      },
+      "required": ["start", "end"]
+    }
+  },
+  {
+    "name": "dump_module",
+    "description": "Dump a loaded module with optional PE reconstruction",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name to dump" },
+        "output": { "type": "string", "description": "Output file path (optional)" },
+        "reconstruct": { "type": "boolean", "description": "Reconstruct PE (fix imports, sections)", "default": true }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "dump_minidump",
+    "description": "Create a WinDbg-compatible minidump file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "output": { "type": "string", "description": "Output file path for the minidump" },
+        "include_memory": { "type": "boolean", "description": "Include full memory", "default": true },
+        "include_threads": { "type": "boolean", "description": "Include thread info", "default": true },
+        "include_handles": { "type": "boolean", "description": "Include handle info", "default": false }
+      },
+      "required": ["output"]
+    }
+  },
+  {
+    "name": "dump_list",
+    "description": "List all saved dumps in the catalog",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "process": { "type": "string", "description": "Filter by process name" },
+        "tag": { "type": "string", "description": "Filter by tag" }
+      }
+    }
+  },
+  {
+    "name": "dump_info",
+    "description": "Get detailed information about a dump",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_id": { "type": "integer", "description": "Dump ID to get info for" }
+      },
+      "required": ["dump_id"]
+    }
+  },
+  {
+    "name": "dump_compare",
+    "description": "Compare two dumps and find differences (binary diff)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_a": { "type": "integer", "description": "First dump ID" },
+        "dump_b": { "type": "integer", "description": "Second dump ID" }
+      },
+      "required": ["dump_a", "dump_b"]
+    }
+  },
+  {
+    "name": "dump_search",
+    "description": "Search for a pattern within a dump",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_id": { "type": "integer", "description": "Dump ID to search" },
+        "pattern": { "type": "string", "description": "Pattern to search (hex bytes, ?? for wildcard)" },
+        "max_results": { "type": "integer", "description": "Maximum results to return", "default": 100 },
+        "include_context": { "type": "boolean", "description": "Include surrounding bytes", "default": false }
+      },
+      "required": ["dump_id", "pattern"]
+    }
+  },
+  {
+    "name": "dump_annotate",
+    "description": "Add an annotation/bookmark to a dump",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_id": { "type": "integer", "description": "Dump ID to annotate" },
+        "offset": { "type": "integer", "description": "Offset within the dump" },
+        "label": { "type": "string", "description": "Annotation label" },
+        "description": { "type": "string", "description": "Annotation description" }
+      },
+      "required": ["dump_id", "offset", "label"]
+    }
+  },
+  {
+    "name": "dump_incremental",
+    "description": "Create an incremental dump (changes since base dump)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "base_dump_id": { "type": "integer", "description": "Base dump ID to compare against" }
+      },
+      "required": ["base_dump_id"]
+    }
+  },
+  {
+    "name": "dump_delete",
+    "description": "Delete a dump from the catalog and optionally from disk",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_id": { "type": "integer", "description": "Dump ID to delete" },
+        "delete_file": { "type": "boolean", "description": "Also delete the dump file from disk", "default": false }
+      },
+      "required": ["dump_id"]
+    }
+  },
+  {
+    "name": "pe_reconstruct",
+    "description": "Reconstruct a PE from a memory dump (Scylla-style import reconstruction)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dump_id": { "type": "integer", "description": "Dump ID containing the module" },
+        "module": { "type": "string", "description": "Module name within the dump" },
+        "output": { "type": "string", "description": "Output file path for reconstructed PE" },
+        "fix_imports": { "type": "boolean", "description": "Rebuild import table", "default": true },
+        "fix_relocations": { "type": "boolean", "description": "Rebuild relocation table", "default": false },
+        "fix_alignment": { "type": "boolean", "description": "Fix section alignment", "default": true },
+        "fix_checksum": { "type": "boolean", "description": "Fix PE checksum", "default": true }
+      },
+      "required": ["output"]
+    }
+  },
+  {
+    "name": "pe_validate",
+    "description": "Validate a dumped PE file structure",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to PE file to validate" },
+        "dump_id": { "type": "integer", "description": "Alternatively, dump ID containing the PE" }
+      }
+    }
+  },
+
+  {
+    "name": "introspect_process",
+    "description": "Get detailed information about a process including path, architecture, thread count, and PEB address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID (default: current process)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_process_list",
+    "description": "Enumerate all running processes with basic info",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": { "type": "string", "description": "Filter by process name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_peb",
+    "description": "Get Process Environment Block (PEB) information including debug flags, image base, and OS version",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID (default: current process, remote requires elevated privileges)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_memory_map",
+    "description": "Get complete memory map of a process with region info, protection, and types",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID (default: current process)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_environment",
+    "description": "Get environment variables for the current process",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "introspect_cwd",
+    "description": "Get current working directory",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "introspect_set_cwd",
+    "description": "Set current working directory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "New working directory path" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "introspect_thread",
+    "description": "Get detailed thread information including priority, state, and TEB address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID" }
+      },
+      "required": ["tid"]
+    }
+  },
+  {
+    "name": "introspect_thread_list",
+    "description": "Enumerate all threads in a process with detailed info",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID (default: current process)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_teb",
+    "description": "Get Thread Environment Block (TEB) information including stack bounds, TLS, and last error",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID (default: current thread)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_tls",
+    "description": "Get Thread Local Storage (TLS) slots for the current thread",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "introspect_module",
+    "description": "Get detailed module information including entry point, version info, and timestamps",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Module name (e.g., 'kernel32.dll')" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "introspect_module_list",
+    "description": "Enumerate all loaded modules with detailed info",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Process ID (default: current process)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_sections",
+    "description": "Get PE section information for a module (.text, .data, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "module": { "type": "string", "description": "Module name or base address" }
+      },
+      "required": ["module"]
+    }
+  },
+  {
+    "name": "introspect_handles",
+    "description": "Enumerate open handles (files, registry keys, mutexes, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "description": "Filter by handle type: file, key, event, mutant, process, thread, section" },
+        "name_contains": { "type": "string", "description": "Filter by object name (substring match)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_windows",
+    "description": "Enumerate windows with title, class, and style information",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pid": { "type": "integer", "description": "Filter by process ID" },
+        "class": { "type": "string", "description": "Filter by window class (substring match)" },
+        "title": { "type": "string", "description": "Filter by window title (substring match)" },
+        "visible_only": { "type": "boolean", "description": "Only show visible windows", "default": false },
+        "top_level_only": { "type": "boolean", "description": "Only show top-level windows", "default": false }
+      }
+    }
+  },
+  {
+    "name": "introspect_window",
+    "description": "Get detailed information about a specific window",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "hwnd": { "type": "integer", "description": "Window handle (HWND)" }
+      },
+      "required": ["hwnd"]
+    }
+  },
+  {
+    "name": "introspect_child_windows",
+    "description": "Enumerate child windows of a parent window",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "hwnd": { "type": "integer", "description": "Parent window handle (HWND)" }
+      },
+      "required": ["hwnd"]
+    }
+  },
+  {
+    "name": "introspect_token",
+    "description": "Get security token information including user, privileges, and integrity level",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tid": { "type": "integer", "description": "Thread ID for impersonation token (omit for process token)" }
+      }
+    }
+  },
+  {
+    "name": "introspect_adjust_privilege",
+    "description": "Enable or disable a privilege in the current process token",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Privilege name (e.g., 'SeDebugPrivilege')" },
+        "enable": { "type": "boolean", "description": "Enable (true) or disable (false) the privilege" }
+      },
+      "required": ["name", "enable"]
+    }
+  },
+  {
+    "name": "safety_status",
+    "description": "Get current safety mode, statistics, rate limits, and pending approvals",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "safety_set_mode",
+    "description": "Change safety mode: 'educational' (most restrictive), 'standard' (default), or 'expert' (least restrictive)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "description": "Safety mode: educational, standard, or expert" }
+      },
+      "required": ["mode"]
+    }
+  },
+  {
+    "name": "safety_approve",
+    "description": "Approve a pending dangerous operation using its approval token",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "description": "Approval token from the pending operation" }
+      },
+      "required": ["token"]
+    }
+  },
+  {
+    "name": "safety_pending",
+    "description": "List all pending operations waiting for approval",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "safety_config",
+    "description": "Get or update safety configuration (rate limits, size limits, auto-backup settings)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "updates": { "type": "object", "description": "Optional config updates: {dry_run_enabled, auto_backup, max_patch_history}" }
+      }
+    }
+  },
+  {
+    "name": "safety_backup",
+    "description": "Create a backup of current patch state for crash recovery",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "safety_reset",
+    "description": "Reset safety statistics and clean up expired approvals",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "patch_history",
+    "description": "Get history of all patches applied in this session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": { "type": "integer", "description": "Maximum entries to return" }
+      }
+    }
+  },
+  {
+    "name": "patch_undo",
+    "description": "Undo a specific patch by its ID, restoring original bytes",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Patch ID from patch_history" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "patch_preview",
+    "description": "Preview a patch operation (dry-run) showing diff before applying",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Memory address to patch" },
+        "bytes": { "type": "string", "description": "Hex-encoded bytes to write (space-separated)" }
+      },
+      "required": ["address", "bytes"]
+    }
+  },
+  {
+    "name": "trace_session_create",
+    "description": "Create a new API call trace session with optional configuration",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Session name (default: 'default')" },
+        "max_events": { "type": "integer", "description": "Maximum events to buffer (default: 10000)" },
+        "capture_duration": { "type": "boolean", "description": "Capture call duration (default: true)" },
+        "capture_output": { "type": "boolean", "description": "Capture output parameters (default: true)" },
+        "stack_depth": { "type": "integer", "description": "Call stack depth to capture (0-64, default: 16)" }
+      }
+    }
+  },
+  {
+    "name": "trace_control",
+    "description": "Control a trace session (start, stop, pause, resume) using a consolidated action",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "description": "Control action: start, stop, pause, or resume" },
+        "session_id": { "type": "integer", "description": "Session ID from trace_session_create" }
+      },
+      "required": ["action", "session_id"]
+    }
+  },
+  {
+    "name": "trace_session_start",
+    "description": "Start capturing API calls for a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID from trace_session_create" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_session_stop",
+    "description": "Stop capturing API calls for a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_session_pause",
+    "description": "Pause API call capture (can be resumed)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_session_resume",
+    "description": "Resume a paused trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_session_close",
+    "description": "Close and cleanup a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_session_list",
+    "description": "List all trace sessions with their status",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "trace_session_info",
+    "description": "Get detailed information about a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_events",
+    "description": "Get captured API call events from a session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" },
+        "count": { "type": "integer", "description": "Maximum events to return (default: 100)" },
+        "offset": { "type": "integer", "description": "Offset for pagination (default: 0)" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_events_clear",
+    "description": "Clear captured events from a session buffer",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_stats",
+    "description": "Get statistics for a trace session (per-API counts, durations, etc.)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_filter_set",
+    "description": "Set filter for a trace session (include/exclude APIs, modules, threads)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" },
+        "include_apis": { "type": "array", "items": { "type": "string" }, "description": "API name patterns to include (prefix:, suffix:, contains:, regex:, or exact match)" },
+        "exclude_apis": { "type": "array", "items": { "type": "string" }, "description": "API name patterns to exclude" },
+        "include_modules": { "type": "array", "items": { "type": "string" }, "description": "Module names to include" },
+        "exclude_modules": { "type": "array", "items": { "type": "string" }, "description": "Module names to exclude" },
+        "include_threads": { "type": "array", "items": { "type": "integer" }, "description": "Thread IDs to include" },
+        "exclude_threads": { "type": "array", "items": { "type": "integer" }, "description": "Thread IDs to exclude" },
+        "failed_only": { "type": "boolean", "description": "Only capture failed API calls" },
+        "success_only": { "type": "boolean", "description": "Only capture successful API calls" },
+        "sample_rate": { "type": "integer", "description": "Sample 1 in N calls (default: 1 = all)" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_preset_list",
+    "description": "List available filter presets",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "trace_preset_apply",
+    "description": "Apply a filter preset to a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" },
+        "preset_id": { "type": "integer", "description": "Preset ID from trace_preset_list" }
+      },
+      "required": ["session_id", "preset_id"]
+    }
+  },
+  {
+    "name": "trace_preset_create",
+    "description": "Create a new filter preset from current session filter",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Preset name" },
+        "description": { "type": "string", "description": "Preset description" },
+        "filter": { "type": "object", "description": "Filter configuration (same as trace_filter_set)" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "trace_preset_delete",
+    "description": "Delete a custom filter preset",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "preset_id": { "type": "integer", "description": "Preset ID" }
+      },
+      "required": ["preset_id"]
+    }
+  },
+  {
+    "name": "trace_pack_list",
+    "description": "List available API definition packs",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "trace_pack_info",
+    "description": "Get detailed information about an API pack",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pack_id": { "type": "string", "description": "Pack ID (e.g., 'kernel32', 'ntdll')" }
+      },
+      "required": ["pack_id"]
+    }
+  },
+  {
+    "name": "trace_pack_load",
+    "description": "Load a custom API definition pack from JSON",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to API pack JSON file" }
+      },
+      "required": ["path"]
+    }
+  },
+  {
+    "name": "trace_pack_unload",
+    "description": "Unload a custom API definition pack",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pack_id": { "type": "string", "description": "Pack ID to unload" }
+      },
+      "required": ["pack_id"]
+    }
+  },
+  {
+    "name": "trace_hooks_list",
+    "description": "List installed API hooks for a trace session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "trace_queue_stats",
+    "description": "Get event queue statistics (depth, drops, events/sec)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": { "type": "integer", "description": "Session ID" }
+      },
+      "required": ["session_id"]
+    }
+  },
+  {
+    "name": "struct_create",
+    "description": "Create a new structure definition with fields",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Structure name" },
+        "fields": { "type": "array", "description": "Array of field definitions [{name, type, offset?, description?}]", "items": { "type": "object" } },
+        "is_64bit": { "type": "boolean", "description": "Whether structure is for 64-bit (default: true)", "default": true },
+        "description": { "type": "string", "description": "Optional structure description" }
+      },
+      "required": ["name", "fields"]
+    }
+  },
+  {
+    "name": "struct_list",
+    "description": "List all defined structures and enums",
+    "inputSchema": { "type": "object", "properties": {} }
+  },
+  {
+    "name": "struct_get",
+    "description": "Get a structure definition by ID or name",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Structure ID" },
+        "name": { "type": "string", "description": "Structure name (alternative to ID)" }
+      }
+    }
+  },
+  {
+    "name": "struct_delete",
+    "description": "Delete a structure definition",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Structure ID to delete" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "struct_read",
+    "description": "Read structure data from memory address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "structure_id": { "type": "integer", "description": "Structure ID" },
+        "address": { "type": "string", "description": "Memory address to read from" },
+        "deref_depth": { "type": "integer", "description": "Pointer dereference depth (default: 1)", "default": 1 },
+        "max_string_length": { "type": "integer", "description": "Max string read length (default: 256)", "default": 256 }
+      },
+      "required": ["structure_id", "address"]
+    }
+  },
+  {
+    "name": "struct_edit_field",
+    "description": "Edit a field value in a structure at memory address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Base address of structure" },
+        "structure_id": { "type": "integer", "description": "Structure ID" },
+        "field_name": { "type": "string", "description": "Field name to edit" },
+        "new_value": { "type": "string", "description": "New value (as string)" }
+      },
+      "required": ["address", "structure_id", "field_name", "new_value"]
+    }
+  },
+  {
+    "name": "struct_export",
+    "description": "Export structure as code (C, Rust, C#, Python)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "structure_id": { "type": "integer", "description": "Structure ID" },
+        "language": { "type": "string", "description": "Target language: c, rust, csharp, python", "default": "c" },
+        "include_comments": { "type": "boolean", "description": "Include field descriptions", "default": true },
+        "include_offsets": { "type": "boolean", "description": "Include offset annotations", "default": true }
+      },
+      "required": ["structure_id"]
+    }
+  },
+  {
+    "name": "struct_auto_analyze",
+    "description": "Auto-analyze memory to suggest structure fields using heuristics",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Address to analyze" },
+        "size": { "type": "integer", "description": "Size in bytes to analyze" },
+        "min_confidence": { "type": "number", "description": "Minimum confidence threshold 0.0-1.0 (default: 0.5)", "default": 0.5 },
+        "detect_pointers": { "type": "boolean", "description": "Detect pointer fields", "default": true },
+        "detect_strings": { "type": "boolean", "description": "Detect string fields", "default": true },
+        "detect_vtables": { "type": "boolean", "description": "Detect vtable pointers", "default": true }
+      },
+      "required": ["address", "size"]
+    }
+  },
+  {
+    "name": "struct_save",
+    "description": "Save structure definitions to file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": { "type": "string", "description": "Output filename" },
+        "structure_ids": { "type": "array", "description": "Specific IDs to save (empty = all)", "items": { "type": "integer" } }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "struct_load",
+    "description": "Load structure definitions from file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filename": { "type": "string", "description": "Input filename" },
+        "merge": { "type": "boolean", "description": "Merge with existing (true) or replace (false)", "default": true }
+      },
+      "required": ["filename"]
+    }
+  },
+  {
+    "name": "enum_create",
+    "description": "Create an enum type definition",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Enum name" },
+        "members": { "type": "array", "description": "Array of {name, value, description?}", "items": { "type": "object" } },
+        "underlying_size": { "type": "integer", "description": "Size in bytes (default: 4)", "default": 4 },
+        "is_flags": { "type": "boolean", "description": "Whether enum is bitwise combinable", "default": false }
+      },
+      "required": ["name", "members"]
+    }
+  },
+  {
+    "name": "watch_address_create",
+    "description": "Create a watch to monitor reads/writes to an address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Address to watch" },
+        "size": { "type": "integer", "description": "Size of watched region (1, 2, 4, or 8)", "default": 4 },
+        "access_type": { "type": "string", "description": "Access type: read, write, read_write, execute", "default": "write" },
+        "max_hits": { "type": "integer", "description": "Max hits to record (0 = unlimited)", "default": 100 },
+        "capture_registers": { "type": "boolean", "description": "Capture CPU registers on hit", "default": true },
+        "capture_stack": { "type": "boolean", "description": "Capture stack snapshot", "default": false },
+        "auto_disassemble": { "type": "boolean", "description": "Disassemble around hit instruction", "default": true },
+        "name": { "type": "string", "description": "Optional watch name" }
+      },
+      "required": ["address"]
+    }
+  },
+  {
+    "name": "watch_instruction_create",
+    "description": "Create a watch to monitor what addresses an instruction accesses",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "instruction_address": { "type": "string", "description": "Instruction address to watch" },
+        "track_reads": { "type": "boolean", "description": "Track read accesses", "default": true },
+        "track_writes": { "type": "boolean", "description": "Track write accesses", "default": true },
+        "max_addresses": { "type": "integer", "description": "Max unique addresses to track", "default": 1000 },
+        "name": { "type": "string", "description": "Optional watch name" }
+      },
+      "required": ["instruction_address"]
+    }
+  },
+  {
+    "name": "watch_list",
+    "description": "List all active watches",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "state": { "type": "string", "description": "Filter by state: active, paused" },
+        "access_type": { "type": "string", "description": "Filter by access type" }
+      }
+    }
+  },
+  {
+    "name": "watch_hits_get",
+    "description": "Get hits from an address watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" },
+        "start": { "type": "integer", "description": "Starting hit number (1-indexed)", "default": 1 },
+        "count": { "type": "integer", "description": "Max hits to return", "default": 50 },
+        "thread_filter": { "type": "integer", "description": "Filter by thread ID" }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_accessed_get",
+    "description": "Get addresses accessed by an instruction watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" },
+        "access_type_filter": { "type": "string", "description": "Filter by access type" },
+        "min_count": { "type": "integer", "description": "Minimum access count filter" },
+        "sort_by_count": { "type": "boolean", "description": "Sort by access count descending", "default": true },
+        "max_results": { "type": "integer", "description": "Max results", "default": 100 }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_pause",
+    "description": "Pause a watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_resume",
+    "description": "Resume a paused watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_remove",
+    "description": "Remove a watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_clear_hits",
+    "description": "Clear recorded hits from a watch",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" },
+        "older_than": { "type": "integer", "description": "Clear hits older than timestamp (ms)" }
+      },
+      "required": ["watch_id"]
+    }
+  },
+  {
+    "name": "watch_quick_action",
+    "description": "Perform quick action on a watch hit (add to list, create hook, copy AOB)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "watch_id": { "type": "integer", "description": "Watch ID" },
+        "action": { "type": "string", "description": "Action: add_to_list, create_hook, copy_aob, set_breakpoint" },
+        "hit_number": { "type": "integer", "description": "Hit number (for address watches)" },
+        "target_address": { "type": "string", "description": "Target address (for instruction watches)" }
+      },
+      "required": ["watch_id", "action"]
+    }
+  },
+  {
+    "name": "yara_create_rule",
+    "description": "Create a custom YARA rule from components",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Rule name (identifier)" },
+        "namespace": { "type": "string", "description": "Rule namespace (optional)" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Rule tags" },
+        "metadata": { "type": "object", "description": "Key-value metadata pairs" },
+        "strings": { "type": "array", "description": "String definitions [{id, value, type: text|hex|regex, modifiers}]" },
+        "condition": { "type": "string", "description": "YARA condition expression" }
+      },
+      "required": ["name", "condition"]
+    }
+  },
+  {
+    "name": "yara_load_rules",
+    "description": "Load YARA rules from source or file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rules": { "type": "array", "description": "Array of {name, source} or {name, file_path}" },
+        "namespace": { "type": "string", "description": "Default namespace for rules" }
+      },
+      "required": ["rules"]
+    }
+  },
+  {
+    "name": "yara_scan_memory",
+    "description": "Scan memory with loaded YARA rules",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "modules": { "type": "array", "items": { "type": "string" }, "description": "Modules to scan (empty = all)" },
+        "max_matches": { "type": "integer", "description": "Maximum matches per rule" },
+        "timeout": { "type": "integer", "description": "Timeout in seconds" },
+        "include_private": { "type": "boolean", "description": "Include private memory" },
+        "include_mapped": { "type": "boolean", "description": "Include mapped memory" },
+        "include_image": { "type": "boolean", "description": "Include image (module) memory" }
+      }
+    }
+  },
+  {
+    "name": "yara_list_rules",
+    "description": "List currently loaded YARA rules",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "find_instructions",
+    "description": "Find instruction sequences matching a pattern",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "patterns": { "type": "array", "description": "Instruction patterns [{mnemonic, operands, optional, max_gap}]" },
+        "module": { "type": "string", "description": "Module to search in (optional)" },
+        "start_address": { "type": "string", "description": "Start address (hex)" },
+        "end_address": { "type": "string", "description": "End address (hex)" },
+        "max_results": { "type": "integer", "description": "Maximum results (default 100)" },
+        "functions_only": { "type": "boolean", "description": "Search only in functions" }
+      },
+      "required": ["patterns"]
+    }
+  },
+  {
+    "name": "signature_db_create",
+    "description": "Create a new signature database",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Database name" },
+        "version": { "type": "string", "description": "Initial version (e.g., 1.0.0)" },
+        "description": { "type": "string", "description": "Database description" },
+        "author": { "type": "string", "description": "Author name" }
+      },
+      "required": ["name"]
+    }
+  },
+  {
+    "name": "signature_db_add",
+    "description": "Add a signature pattern to a database",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": { "type": "string", "description": "Database name" },
+        "name": { "type": "string", "description": "Signature name" },
+        "pattern": { "type": "string", "description": "AOB pattern with wildcards" },
+        "description": { "type": "string", "description": "What this signature matches" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags for categorization" },
+        "pattern_type": { "type": "string", "description": "Resolution type: address, pointer, rel32, etc." },
+        "offset": { "type": "integer", "description": "Offset adjustment after match" }
+      },
+      "required": ["database", "name", "pattern"]
+    }
+  },
+  {
+    "name": "signature_db_list",
+    "description": "List loaded signature databases",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "signature_db_scan",
+    "description": "Scan memory using signatures from a database",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": { "type": "string", "description": "Database name" },
+        "max_results": { "type": "integer", "description": "Maximum results" }
+      },
+      "required": ["database"]
+    }
+  },
+  {
+    "name": "signature_db_export",
+    "description": "Export a signature database to JSON",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": { "type": "string", "description": "Database name" },
+        "file_path": { "type": "string", "description": "Output file path" }
+      },
+      "required": ["database"]
+    }
+  },
+  {
+    "name": "signature_db_import",
+    "description": "Import a signature database from JSON",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file_path": { "type": "string", "description": "Input file path" }
+      },
+      "required": ["file_path"]
+    }
+  },
+  {
+    "name": "signature_db_version",
+    "description": "Get or bump signature database version",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": { "type": "string", "description": "Database name" },
+        "bump": { "type": "string", "description": "Version bump: major, minor, or patch" },
+        "description": { "type": "string", "description": "Changelog description for bump" }
+      },
+      "required": ["database"]
+    }
+  },
+  {
+    "name": "signature_auto_generate",
+    "description": "Auto-generate a signature from code bytes",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "address": { "type": "string", "description": "Address to generate signature from" },
+        "size": { "type": "integer", "description": "Number of bytes (default 16)" },
+        "name": { "type": "string", "description": "Signature name" },
+        "wildcard_offsets": { "type": "array", "items": { "type": "integer" }, "description": "Byte offsets to wildcard" }
+      },
+      "required": ["address", "name"]
+    }
+  },
+  {
+    "name": "pointer_scan_create",
+    "description": "Create a new pointer scan session for finding pointer paths to a target address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target_address": { "type": "string", "description": "Target address to find pointers to (hex)" },
+        "max_depth": { "type": "integer", "description": "Maximum pointer depth (1-10, default 5)" },
+        "max_offset": { "type": "integer", "description": "Maximum offset from pointer value (default 0x1000)" },
+        "offset_alignment": { "type": "integer", "description": "Offset alignment (default 4)" },
+        "static_only": { "type": "boolean", "description": "Only include static (module-relative) bases (default true)" },
+        "base_modules": { "type": "array", "items": { "type": "string" }, "description": "Specific modules to use as bases (empty = all)" },
+        "max_results": { "type": "integer", "description": "Maximum results (default 10000)" }
+      },
+      "required": ["target_address"]
+    }
+  },
+  {
+    "name": "pointer_scan_start",
+    "description": "Start scanning for pointers in a created session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID from pointer_scan_create" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_rescan",
+    "description": "Rescan pointers to validate paths and update stability scores (use after process restart)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "new_target_address": { "type": "string", "description": "New target address if changed (hex)" },
+        "filter_invalid": { "type": "boolean", "description": "Remove invalid paths (default true)" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_results",
+    "description": "Get paginated results from a pointer scan session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "offset": { "type": "integer", "description": "Result offset for pagination (default 0)" },
+        "limit": { "type": "integer", "description": "Maximum results to return (default 100, max 1000)" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_count",
+    "description": "Get the number of pointer paths found in a scan session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_progress",
+    "description": "Get current progress of an ongoing pointer scan",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "pointer_scan_cancel",
+    "description": "Cancel an ongoing pointer scan",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "pointer_scan_close",
+    "description": "Close a pointer scan session and free resources",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID to close" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_list",
+    "description": "List all active pointer scan sessions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "pointer_resolve",
+    "description": "Resolve a pointer path to its current address",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "base_module": { "type": "string", "description": "Module name for base address (e.g., 'game.exe')" },
+        "base_offset": { "type": "string", "description": "Offset from module base (hex)" },
+        "offsets": { "type": "array", "items": { "type": "string" }, "description": "Array of offsets in the pointer chain (hex, can be negative)" }
+      },
+      "required": ["offsets"]
+    }
+  },
+  {
+    "name": "pointer_scan_compare",
+    "description": "Compare two pointer scan sessions to find stable pointers",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "first_scan_id": { "type": "integer", "description": "First scan session ID" },
+        "second_scan_id": { "type": "integer", "description": "Second scan session ID" }
+      },
+      "required": ["first_scan_id", "second_scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_export",
+    "description": "Export pointer scan results to a file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID" },
+        "format": { "type": "string", "description": "Export format: json, csv, or ptr (Cheat Engine)", "default": "json" }
+      },
+      "required": ["scan_id"]
+    }
+  },
+  {
+    "name": "pointer_scan_import",
+    "description": "Import pointer paths from a JSON file into a session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scan_id": { "type": "integer", "description": "Scan session ID to import into" },
+        "json": { "type": "string", "description": "JSON string containing pointer paths array" }
+      },
+      "required": ["scan_id", "json"]
+    }
+  }
+]

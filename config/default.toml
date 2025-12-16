@@ -1,0 +1,160 @@
+# Ghost-MCP Default Configuration
+
+# =============================================================================
+# Multi-Server Configuration
+# =============================================================================
+# Ghost-MCP uses 4 specialized servers to stay under MCP's ~100 tool limit:
+# - ghost-core-mcp (Port 13340): Live process interaction, debugging, safety
+# - ghost-analysis-mcp (Port 13341): Memory scanning, structures, introspection
+# - ghost-static-mcp (Port 13342): Static RE tools (r2, IDA, Ghidra), AI, YARA
+# - ghost-extended-mcp (Port 13343): Injection, anti-debug, input, speedhack
+# Agent always runs on port 13338 (TCP)
+
+[servers]
+# Server ports (agent always on 13338)
+agent_port = 13338
+core_port = 13340
+analysis_port = 13341
+static_port = 13342
+extended_port = 13343
+
+[servers.core]
+enabled = true
+transport = "stdio"  # Primary server uses stdio for Claude Desktop
+tool_count_target = 85
+
+[servers.analysis]
+enabled = true
+transport = "tcp"
+tool_count_target = 82
+
+[servers.static]
+enabled = true
+transport = "tcp"
+tool_count_target = 84
+
+[servers.extended]
+enabled = true
+transport = "tcp"
+tool_count_target = 85
+
+[logging]
+# Enable console logging
+console_enabled = true
+
+# Enable file logging
+file_enabled = false
+
+# Log file path (when file_enabled = true)
+file_path = "ghost-mcp.log"
+
+# Include timestamps in logs
+timestamps = true
+
+# Include source file/line info (verbose)
+file_info = false
+
+# Include module target in logs
+show_target = true
+
+# Use ANSI colors in console output
+ansi_colors = true
+
+# Maximum log file size in bytes before rotation (0 = no limit)
+max_file_size = 10485760  # 10MB
+
+# Number of rotated log files to keep
+max_log_files = 5
+
+[agent]
+# Named pipe for host-agent communication
+pipe_name = "\\\\.\\pipe\\ghost-mcp"
+
+# Connection timeout in seconds
+connect_timeout = 10
+
+# Request timeout in seconds
+request_timeout = 30
+
+[limits]
+# Maximum response size in bytes
+max_response_size = 1048576  # 1MB
+
+# Maximum items per page
+max_page_size = 1000
+
+# Default items per page
+default_page_size = 100
+
+# Maximum disassembly instructions
+max_disasm_instructions = 100
+
+# Maximum scan results
+max_scan_results = 10000
+
+[security]
+# Default capability scope
+default_scope = "read"
+
+# Scopes requiring confirmation
+require_confirmation = ["patch"]
+
+# Enable audit logging
+audit_enabled = true
+
+# Audit log path
+audit_log = "ghost-audit.log"
+
+[safety]
+# Safety mode: "educational", "standard", or "expert"
+mode = "standard"
+
+# Enable dry-run mode for patches (preview before apply)
+dry_run_enabled = false
+
+# Auto-backup before major changes
+auto_backup = true
+
+# Maximum patch history entries to keep
+max_patch_history = 100
+
+# Enable crash recovery with state restoration
+crash_recovery = true
+
+[safety.rate_limits]
+# Maximum operations per second (0 = unlimited)
+ops_per_second = 100
+
+# Maximum operations per minute (0 = unlimited)
+ops_per_minute = 1000
+
+# Maximum write operations per minute
+writes_per_minute = 60
+
+# Burst allowance (extra ops allowed in short bursts)
+burst_allowance = 10
+
+[safety.limits]
+# Maximum bytes to scan in a single operation (256 MB)
+max_scan_size = 268435456
+
+# Maximum bytes to read in a single operation (16 MB)
+max_read_size = 16777216
+
+# Maximum bytes to write in a single operation (1 MB)
+max_write_size = 1048576
+
+# Maximum memory allocation per request (64 MB)
+max_alloc_size = 67108864
+
+# Maximum total allocations
+max_total_allocs = 100
+
+# Maximum disassembly instructions
+max_disasm_instructions = 10000
+
+# Maximum search results
+max_search_results = 100000
+
+# Warning threshold (percentage of limit)
+warning_threshold_percent = 80

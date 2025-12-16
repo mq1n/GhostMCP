@@ -1,0 +1,72 @@
+# Ghost-MCP Security Policy
+
+[policy]
+# Default permission scope for all tools
+default_scope = "read"
+
+# Tools/operations requiring user confirmation
+require_confirmation = [
+    "memory.write",
+    "patch.write",
+    "patch.nop",
+    "hook.create",
+    "hook.remove",
+]
+
+# Enable audit logging for all operations
+audit_all = true
+
+# Rate limiting (requests per minute)
+rate_limit = 1000
+
+[scopes]
+# Read scope - safe, read-only operations
+read = [
+    "agent.status",
+    "memory.read",
+    "memory.regions",
+    "memory.search",
+    "memory.search_pattern",
+    "module.list",
+    "module.exports",
+    "module.imports",
+    "disasm.at",
+    "disasm.function",
+    "symbol.resolve",
+    "xref.to",
+    "string.list",
+    "breakpoint.list",
+    "thread.list",
+    "thread.registers",
+    "stack.walk",
+]
+
+# Debug scope - can pause/control execution
+debug = [
+    "breakpoint.set",
+    "breakpoint.remove",
+    "execution.continue",
+    "execution.step_into",
+    "execution.step_over",
+    "thread.suspend",
+    "thread.resume",
+]
+
+# Patch scope - can modify memory/code (dangerous)
+patch = [
+    "memory.write",
+    "patch.write",
+    "patch.nop",
+    "hook.create",
+    "hook.remove",
+    "assemble",
+]
+
+[audit]
+# What to log
+log_requests = true
+log_responses = false  # Can be verbose
+log_errors = true
+
+# Retention in days
+retention_days = 30

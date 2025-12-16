@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "ghost-core": {
+      "command": "C:\\Users\\Koray\\Desktop\\h4x_mcp\\target\\release\\ghost-core-mcp.exe",
+      "args": ["--transport", "stdio"]
+    },
+    "ghost-analysis": {
+      "command": "C:\\Users\\Koray\\Desktop\\h4x_mcp\\target\\release\\ghost-analysis-mcp.exe",
+      "args": ["--transport", "stdio"]
+    },
+    "ghost-static": {
+      "command": "C:\\Users\\Koray\\Desktop\\h4x_mcp\\target\\release\\ghost-static-mcp.exe",
+      "args": ["--transport", "stdio"]
+    },
+    "ghost-extended": {
+      "command": "C:\\Users\\Koray\\Desktop\\h4x_mcp\\target\\release\\ghost-extended-mcp.exe",
+      "args": ["--transport", "stdio"]
+    }
+  }
+}
+
+

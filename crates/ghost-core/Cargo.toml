@@ -1,0 +1,23 @@
+[package]
+name = "ghost-core"
+version.workspace = true
+edition = "2021"
+description = "Core static library with trait-based interface for Ghost-MCP"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+ghost-common = { path = "../ghost-common" }
+windows = { workspace = true }
+serde_json = { workspace = true }
+hex = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+once_cell = "1.19"
+yara = { workspace = true, optional = true }
+iced-x86 = { workspace = true }
+
+[features]
+default = []
+yara = ["dep:yara"]

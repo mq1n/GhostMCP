@@ -1,0 +1,13 @@
+[package]
+name = "ghost-common"
+version.workspace = true
+edition = "2021"
+description = "Shared types and IPC protocol for Ghost-MCP"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+toml = "0.8"

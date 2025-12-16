@@ -1,0 +1,70 @@
+{
+  "memory": {
+    "description": "Memory operations (read, write, search, scan)",
+    "tools": ["memory_read", "memory_write", "memory_search", "memory_search_pattern", "memory_regions"]
+  },
+  "module": {
+    "description": "Module operations (list, exports, imports, strings)",
+    "tools": ["module_list", "module_exports", "module_imports", "string_list", "symbol_resolve"]
+  },
+  "debug": {
+    "description": "Debugging operations (breakpoints, stepping)",
+    "tools": ["agent_status", "agent_reconnect"]
+  },
+  "disasm": {
+    "description": "Disassembly and decompilation operations",
+    "tools": ["disasm_at", "disasm_function", "decompile"]
+  },
+  "script": {
+    "description": "Scripting engine operations (Frida-style hooks and RPC)",
+    "tools": ["script_load", "script_unload", "script_reload", "script_list", "script_status",
+             "hook_create", "hook_remove", "hook_enable", "hook_list",
+             "rpc_list", "rpc_call"]
+  },
+  "scanner": {
+    "description": "Advanced value scanner (Cheat Engine-style iterative scanning)",
+    "tools": ["scan_new", "scan_first", "scan_next", "scan_results", "scan_count",
+             "scan_progress", "scan_cancel", "scan_close", "scan_list",
+             "scan_export", "scan_import"]
+  },
+  "session": {
+    "description": "Session management",
+    "tools": ["session_info", "session_attach", "session_detach"]
+  },
+  "process": {
+    "description": "Process control operations",
+    "tools": ["process_list", "process_spawn", "process_resume", "process_terminate"]
+  },
+  "meta": {
+    "description": "MCP meta commands and utilities",
+    "tools": ["mcp_capabilities", "mcp_documentation", "mcp_version", "mcp_health",
+             "action_last", "action_verify"]
+  },
+  "command": {
+    "description": "Command batching, sequencing, and history",
+    "tools": ["command_batch", "command_history", "command_replay"]
+  },
+  "event": {
+    "description": "Agent-to-AI event streaming and subscriptions",
+    "tools": ["event_subscribe", "event_unsubscribe", "event_poll", "event_list"]
+  },
+  "ai": {
+    "description": "AI/LLM assistance tools for summarization, analysis, and debugging",
+    "tools": ["ai_summarize", "ai_diff", "ai_explain_error", 
+             "debug_session_create", "debug_session_info", "debug_session_update", 
+             "debug_session_close", "debug_session_list",
+             "ai_recommend_breakpoints", "ai_analyze_vulnerability",
+             "ai_learn_pattern", "ai_patterns_list"]
+  },
+  "api_trace": {
+    "description": "API call tracing and monitoring (Rohitab API Monitor style)",
+    "tools": ["trace_session_create", "trace_control", "trace_session_start", "trace_session_stop",
+             "trace_session_pause", "trace_session_resume", "trace_session_close",
+             "trace_session_list", "trace_session_info",
+             "trace_events", "trace_events_clear", "trace_stats", "trace_queue_stats",
+             "trace_filter_set", "trace_preset_list", "trace_preset_apply",
+             "trace_preset_create", "trace_preset_delete",
+             "trace_pack_list", "trace_pack_info", "trace_pack_load", "trace_pack_unload",
+             "trace_hooks_list"]
+  }
+}

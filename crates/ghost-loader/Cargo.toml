@@ -1,0 +1,24 @@
+[package]
+name = "ghost-loader"
+version.workspace = true
+edition = "2021"
+description = "DLL injector for Ghost-MCP agent"
+
+[[bin]]
+name = "ghost-loader"
+path = "src/main.rs"
+
+[dependencies]
+ghost-common = { path = "../ghost-common" }
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Security",
+    "Win32_System_ProcessStatus",
+] }
+clap = { version = "4", features = ["derive"] }
+thiserror = { workspace = true }

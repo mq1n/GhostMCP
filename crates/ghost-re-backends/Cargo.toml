@@ -1,0 +1,38 @@
+[package]
+name = "ghost-re-backends"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Reverse engineering tool backends for Ghost-MCP (IDA Pro, Ghidra, Radare2)"
+
+[features]
+default = []
+# Radare2 backend - works on all platforms
+radare2 = ["dep:r2pipe"]
+# IDA Pro backend - requires IDA Pro v9.x installation and IDADIR env var
+# Only available on platforms where idalib can be built (requires LLVM/Clang)
+ida = ["dep:idalib"]
+# Ghidra backend - uses Headless mode or ghidra-pipe JSON-RPC (cross-platform)
+# No external Rust crate needed - spawns analyzeHeadless or connects via JSON-RPC
+ghidra = []
+# Enable all backends
+all = ["radare2", "ida", "ghidra"]
+
+[dependencies]
+# Core dependencies
+ghost-common = { path = "../ghost-common" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync", "process", "io-util"] }
+hex.workspace = true
+
+# RE tool backends (optional)
+r2pipe = { workspace = true, optional = true }
+# IDA Pro backend - requires IDA Pro v9.x SDK and LLVM/Clang
+idalib = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

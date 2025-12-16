@@ -1,0 +1,11 @@
+[package]
+name = "ghost-test-target"
+version.workspace = true
+edition = "2021"
+description = "Test target application for Ghost-MCP testing"
+
+[[bin]]
+name = "ghost-test-target"
+path = "src/main.rs"
+
+[dependencies]

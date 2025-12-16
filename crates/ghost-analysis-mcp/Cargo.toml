@@ -1,0 +1,43 @@
+[package]
+name = "ghost-analysis-mcp"
+version.workspace = true
+edition.workspace = true
+description = "Ghost-MCP Analysis Server - Port 13341, 82 tools for memory analysis and scanning"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "ghost-analysis-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "ghost_analysis_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+# Internal crates
+ghost-common = { path = "../ghost-common" }
+ghost-mcp-common = { path = "../ghost-mcp-common" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = "0.1"
+
+# Logging/tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = "1.0"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

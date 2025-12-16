@@ -1,0 +1,123 @@
+[package]
+name = "ghost-mcp"
+version = "0.1.0"
+edition = "2021"
+description = "Ghost-MCP workspace - integration tests only"
+publish = false
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/ghost-common",
+    "crates/ghost-core",
+    "crates/ghost-agent",
+    "crates/ghost-agent-exe",
+    "crates/ghost-loader",
+    "crates/ghost-mcp-client",
+    "crates/ghost-mcp-common",
+    "crates/ghost-core-mcp",
+    "crates/ghost-analysis-mcp",
+    "crates/ghost-static-mcp",
+    "crates/ghost-extended-mcp",
+    "crates/ghost-test-target",
+    "crates/ghost-re-backends",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Ghost-MCP Team"]
+license = "MIT"
+repository = "https://github.com/ghost-mcp/ghost-mcp"
+
+[workspace.dependencies]
+# Shared dependencies
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+thiserror = "2.0.17"
+tracing = "0.1.43"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+hex = "0.4.3"
+
+# Windows API
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_ProcessStatus",
+    "Win32_System_LibraryLoader",
+    "Win32_System_SystemServices",
+    "Win32_System_Pipes",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_System_Kernel",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+] }
+
+# Async runtime (host only)
+tokio = { version = "1.48.0", features = ["full"] }
+
+# IPC
+interprocess = "2.2.3"
+
+# Disassembly & Assembly
+capstone = "0.13.0"
+iced-x86 = { version = "1.21", features = ["std", "decoder", "encoder", "block_encoder", "instr_info", "code_asm"] }
+
+# Pattern Scanning & YARA
+yara = "0.31.0"
+regex = "1.12.2"
+
+# Symbols
+symbolic = "12.17.0"
+
+# RE Tool Backends
+r2pipe = "0.6.0"  # Note: 0.7.0 has Windows compatibility issues with dlopen
+# IDA Pro backend - requires IDA Pro v9.x SDK and LLVM/Clang 19
+idalib = "0.6.1+9.1.250226"
+# Ghidra backend - uses headless mode or ghidra-pipe JSON-RPC
+# No external crate needed - we spawn analyzeHeadless or connect to ghidra-pipe server
+
+# Root package dependencies (for integration tests only)
+[dependencies]
+ghost-common = { path = "crates/ghost-common" }
+ghost-re-backends = { path = "crates/ghost-re-backends", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+ghost-common = { path = "crates/ghost-common" }
+ghost-agent = { path = "crates/ghost-agent" }
+ghost-mcp-common = { path = "crates/ghost-mcp-common" }
+ghost-core-mcp = { path = "crates/ghost-core-mcp" }
+ghost-analysis-mcp = { path = "crates/ghost-analysis-mcp" }
+ghost-static-mcp = { path = "crates/ghost-static-mcp", default-features = false }
+ghost-extended-mcp = { path = "crates/ghost-extended-mcp" }
+tokio = { workspace = true }
+async-trait = "0.1.89"
+tokio-test = "0.4.4"
+
+[features]
+default = []
+live_agent_tests = []
+full_integration_tests = []
+ghost-core-mcp = []
+ghost-analysis-mcp = []
+ghost-static-mcp = []
+ghost-extended-mcp = []
+radare2 = ["ghost-static-mcp/radare2", "ghost-re-backends/radare2"]
+ghidra = ["ghost-static-mcp/ghidra", "ghost-re-backends/ghidra"]
+ida = ["ghost-static-mcp/ida", "ghost-re-backends/ida"]
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+panic = "abort"

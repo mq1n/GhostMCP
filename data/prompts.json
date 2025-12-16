@@ -1,0 +1,13 @@
+[
+  {
+    "name": "analyze_function",
+    "description": "Analyze a function at a specific address",
+    "arguments": [
+      {
+        "name": "address",
+        "description": "Memory address of the function",
+        "required": true
+      }
+    ]
+  }
+]

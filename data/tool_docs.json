@@ -1,0 +1,1680 @@
+{
+  "memory_read": {
+    "name": "memory_read",
+    "category": "memory",
+    "description": "Read bytes from a memory address in the target process.",
+    "help": "Reads raw bytes from the specified memory address. Returns hex-encoded bytes. The address can be specified as a decimal or hexadecimal string.",
+    "examples": [
+      {
+        "description": "Read 16 bytes from address",
+        "arguments": {"address": "0x140001000", "size": 16},
+        "expected": "Hex-encoded bytes"
+      }
+    ],
+    "related": ["memory_write", "memory_search"]
+  },
+  "memory_write": {
+    "name": "memory_write",
+    "category": "memory",
+    "description": "Write bytes to a memory address in the target process.",
+    "help": "Writes raw bytes to the specified memory address. Bytes should be hex-encoded. The memory protection will be temporarily changed if needed.",
+    "examples": [
+      {
+        "description": "Write NOP instructions",
+        "arguments": {"address": 5368713216, "bytes": "9090909090"},
+        "expected": "Success confirmation"
+      }
+    ],
+    "related": ["memory_read", "memory_regions"]
+  },
+  "memory_search": {
+    "name": "memory_search",
+    "category": "memory",
+    "description": "Search memory for an exact value.",
+    "help": "Searches all readable memory regions for a specific value. Supports various data types including integers, floats, and strings.",
+    "examples": [
+      {
+        "description": "Search for integer value",
+        "arguments": {"value": "100", "type": "i32"},
+        "expected": "List of addresses containing the value"
+      }
+    ],
+    "related": ["memory_search_pattern", "memory_read"]
+  },
+  "memory_search_pattern": {
+    "name": "memory_search_pattern",
+    "category": "memory",
+    "description": "Search memory for an AOB (Array of Bytes) pattern with wildcards.",
+    "help": "Searches memory for a byte pattern. Use ?? for wildcard bytes. Useful for finding code patterns that may vary slightly.",
+    "examples": [
+      {
+        "description": "Search for code pattern",
+        "arguments": {"pattern": "48 8B ?? 00 FF"},
+        "expected": "List of addresses matching the pattern"
+      }
+    ],
+    "related": ["memory_search", "memory_read"]
+  },
+  "memory_regions": {
+    "name": "memory_regions",
+    "category": "memory",
+    "description": "List all memory regions with protection flags.",
+    "help": "Enumerates all memory regions in the target process, showing base address, size, protection flags, and mapped file (if any).",
+    "examples": [
+      {
+        "description": "List all regions",
+        "arguments": {},
+        "expected": "List of memory regions with details"
+      }
+    ],
+    "related": ["memory_read", "module_list"]
+  },
+  "module_list": {
+    "name": "module_list",
+    "category": "module",
+    "description": "List all loaded modules in the target process.",
+    "help": "Enumerates all loaded DLLs and the main executable, showing base address, size, and full path.",
+    "examples": [
+      {
+        "description": "List all modules",
+        "arguments": {},
+        "expected": "List of modules with base addresses and paths"
+      }
+    ],
+    "related": ["module_exports", "module_imports"]
+  },
+  "module_exports": {
+    "name": "module_exports",
+    "category": "module",
+    "description": "List exports from a module.",
+    "help": "Enumerates all exported functions from a specified module. Shows function name, ordinal, and address.",
+    "examples": [
+      {
+        "description": "List kernel32 exports",
+        "arguments": {"module": "kernel32.dll"},
+        "expected": "List of exported functions"
+      }
+    ],
+    "related": ["module_imports", "symbol_resolve"]
+  },
+  "module_imports": {
+    "name": "module_imports",
+    "category": "module",
+    "description": "List imports of a module.",
+    "help": "Enumerates all imported functions for a specified module. Shows source DLL, function name, and IAT address.",
+    "examples": [
+      {
+        "description": "List game.exe imports",
+        "arguments": {"module": "game.exe"},
+        "expected": "List of imported functions"
+      }
+    ],
+    "related": ["module_exports", "symbol_resolve"]
+  },
+  "string_list": {
+    "name": "string_list",
+    "category": "module",
+    "description": "Extract strings from a module.",
+    "help": "Scans a module's data sections for ASCII and Unicode strings. Useful for finding configuration, messages, and other text data.",
+    "examples": [
+      {
+        "description": "Extract strings from module",
+        "arguments": {"module": "game.exe", "min_length": 6},
+        "expected": "List of strings with addresses"
+      }
+    ],
+    "related": ["memory_search", "module_list"]
+  },
+  "symbol_resolve": {
+    "name": "symbol_resolve",
+    "category": "module",
+    "description": "Resolve symbol name to address.",
+    "help": "Resolves a function or variable name to its address. Can use module!function syntax or just function name to search all modules.",
+    "examples": [
+      {
+        "description": "Resolve with module prefix",
+        "arguments": {"name": "kernel32!CreateFileW"},
+        "expected": "Address of CreateFileW"
+      }
+    ],
+    "related": ["module_exports", "module_imports"]
+  },
+  "disasm_at": {
+    "name": "disasm_at",
+    "category": "disasm",
+    "description": "Disassemble instructions at a specific address.",
+    "help": "Disassembles a specified number of instructions starting at the given address. Shows address, bytes, mnemonic, and operands.",
+    "examples": [
+      {
+        "description": "Disassemble 20 instructions",
+        "arguments": {"address": 5368713216, "count": 20},
+        "expected": "Disassembly listing"
+      }
+    ],
+    "related": ["disasm_function", "memory_read"]
+  },
+  "disasm_function": {
+    "name": "disasm_function",
+    "category": "disasm",
+    "description": "Disassemble a complete function.",
+    "help": "Disassembles instructions starting at the given address until a RET instruction is encountered. Useful for analyzing entire functions.",
+    "examples": [
+      {
+        "description": "Disassemble function",
+        "arguments": {"address": 5368713216},
+        "expected": "Complete function disassembly"
+      }
+    ],
+    "related": ["disasm_at", "decompile", "hook_create"]
+  },
+  "decompile": {
+    "name": "decompile",
+    "category": "disasm",
+    "description": "Decompile a function to pseudo-C code (Hex-Rays style).",
+    "help": "Analyzes the assembly code at the given address and generates human-readable pseudo-C code similar to IDA Pro's Hex-Rays decompiler. The output includes variable inference, control flow reconstruction (if/else, loops, switch), and function call identification. Supports different output styles: 'c' for standard C-like output, 'simplified' for high-level overview, and 'verbose' for detailed annotations.",
+    "examples": [
+      {
+        "description": "Decompile function at address",
+        "arguments": {"address": 5368713216},
+        "expected": "Pseudo-C code representation of the function"
+      },
+      {
+        "description": "Decompile with custom name",
+        "arguments": {"address": 5368713216, "name": "ProcessData"},
+        "expected": "Pseudo-C code with function named ProcessData"
+      },
+      {
+        "description": "Decompile with verbose annotations",
+        "arguments": {"address": 5368713216, "style": "verbose"},
+        "expected": "Detailed pseudo-C with register mappings and comments"
+      }
+    ],
+    "related": ["disasm_function", "disasm_at", "symbol_resolve"]
+  },
+  "script_load": {
+    "name": "script_load",
+    "category": "script",
+    "description": "Load a script from file or inline code for Frida-style hooking.",
+    "help": "Loads a JavaScript/Lua script that can create hooks with onEnter/onLeave callbacks. Scripts can export RPC functions for remote calling. Supports hot-reload.",
+    "examples": [
+      {
+        "description": "Load script from file",
+        "arguments": {"path": "C:\\scripts\\myhook.js"},
+        "expected": "Script ID and status"
+      },
+      {
+        "description": "Load inline script",
+        "arguments": {"code": "Interceptor.attach(ptr('0x1000'), { onEnter: function(args) { console.log('called'); } });", "name": "inline_hook"},
+        "expected": "Script ID and status"
+      }
+    ],
+    "related": ["script_unload", "script_reload", "hook_create"]
+  },
+  "script_unload": {
+    "name": "script_unload",
+    "category": "script",
+    "description": "Unload a script by ID.",
+    "help": "Unloads a previously loaded script and removes all its hooks and RPC exports.",
+    "examples": [
+      {
+        "description": "Unload script",
+        "arguments": {"id": 1},
+        "expected": "Confirmation of unload"
+      }
+    ],
+    "related": ["script_load", "script_list"]
+  },
+  "script_reload": {
+    "name": "script_reload",
+    "category": "script",
+    "description": "Hot-reload a script (unload and reload from source).",
+    "help": "Reloads a script from its original source. Useful for development when making changes to script files.",
+    "examples": [
+      {
+        "description": "Reload script",
+        "arguments": {"id": 1},
+        "expected": "Confirmation of reload"
+      }
+    ],
+    "related": ["script_load", "script_unload"]
+  },
+  "script_list": {
+    "name": "script_list",
+    "category": "script",
+    "description": "List all loaded scripts with their status.",
+    "help": "Shows all currently loaded scripts with their IDs, names, source paths, and status.",
+    "examples": [
+      {
+        "description": "List scripts",
+        "arguments": {},
+        "expected": "List of loaded scripts"
+      }
+    ],
+    "related": ["script_load", "script_status"]
+  },
+  "script_status": {
+    "name": "script_status",
+    "category": "script",
+    "description": "Get detailed status of a specific script.",
+    "help": "Shows detailed information about a script including hooks created, RPC exports, and execution statistics.",
+    "examples": [
+      {
+        "description": "Get script status",
+        "arguments": {"id": 1},
+        "expected": "Detailed script information"
+      }
+    ],
+    "related": ["script_list", "hook_list"]
+  },
+  "hook_create": {
+    "name": "hook_create",
+    "category": "script",
+    "description": "Create a hook at an address with Frida-style callbacks.",
+    "help": "Creates an inline hook at the specified address. Supports onEnter (called when function is entered), onLeave (called when function returns), and onException callbacks. Callbacks have access to registers, arguments, return value, and can modify them.",
+    "examples": [
+      {
+        "description": "Hook with onEnter callback",
+        "arguments": {"address": 5368713216, "on_enter": "console.log('RCX:', this.context.rcx);"},
+        "expected": "Hook ID"
+      }
+    ],
+    "related": ["hook_remove", "hook_list", "script_load"]
+  },
+  "hook_remove": {
+    "name": "hook_remove",
+    "category": "script",
+    "description": "Remove a hook by ID.",
+    "help": "Removes a previously created hook and restores the original code.",
+    "examples": [
+      {
+        "description": "Remove hook",
+        "arguments": {"id": 1},
+        "expected": "Confirmation of removal"
+      }
+    ],
+    "related": ["hook_create", "hook_list"]
+  },
+  "hook_enable": {
+    "name": "hook_enable",
+    "category": "script",
+    "description": "Enable or disable a hook.",
+    "help": "Temporarily enables or disables a hook without removing it. Useful for toggling hooks during analysis.",
+    "examples": [
+      {
+        "description": "Disable hook",
+        "arguments": {"id": 1, "enabled": false},
+        "expected": "Confirmation of state change"
+      }
+    ],
+    "related": ["hook_create", "hook_remove"]
+  },
+  "hook_list": {
+    "name": "hook_list",
+    "category": "script",
+    "description": "List all active hooks.",
+    "help": "Shows all currently active hooks with their IDs, addresses, owning scripts, and enabled status.",
+    "examples": [
+      {
+        "description": "List all hooks",
+        "arguments": {},
+        "expected": "List of hooks"
+      },
+      {
+        "description": "List hooks for script",
+        "arguments": {"script_id": 1},
+        "expected": "Filtered list of hooks"
+      }
+    ],
+    "related": ["hook_create", "script_status"]
+  },
+  "rpc_list": {
+    "name": "rpc_list",
+    "category": "script",
+    "description": "List all exported RPC functions from scripts.",
+    "help": "Shows all RPC functions that have been exported by loaded scripts, available for remote calling.",
+    "examples": [
+      {
+        "description": "List all RPC functions",
+        "arguments": {},
+        "expected": "List of RPC exports"
+      }
+    ],
+    "related": ["rpc_call", "script_list"]
+  },
+  "rpc_call": {
+    "name": "rpc_call",
+    "category": "script",
+    "description": "Call an RPC function exported by a script.",
+    "help": "Calls a remote procedure that was exported by a loaded script. Arguments are passed as an array.",
+    "examples": [
+      {
+        "description": "Call RPC function",
+        "arguments": {"name": "getPlayerHealth", "args": []},
+        "expected": "Return value from function"
+      }
+    ],
+    "related": ["rpc_list", "script_load"]
+  },
+  "agent_status": {
+    "name": "agent_status",
+    "category": "debug",
+    "description": "Get the status of the ghost-agent connection.",
+    "help": "Returns information about the current agent connection including target process, PID, and connection status.",
+    "examples": [
+      {
+        "description": "Check agent status",
+        "arguments": {},
+        "expected": "Agent connection details"
+      }
+    ],
+    "related": ["agent_reconnect", "session_info"]
+  },
+  "agent_reconnect": {
+    "name": "agent_reconnect",
+    "category": "debug",
+    "description": "Disconnect and reconnect to the ghost-agent.",
+    "help": "Closes the current agent connection and attempts to reconnect. Useful after rebuilding the agent DLL or if the connection becomes stale.",
+    "examples": [
+      {
+        "description": "Reconnect to agent",
+        "arguments": {},
+        "expected": "Reconnection status"
+      }
+    ],
+    "related": ["agent_status", "session_attach"]
+  },
+  "action_last": {
+    "name": "action_last",
+    "category": "meta",
+    "description": "Get details of the last executed action.",
+    "help": "Returns information about the most recently executed tool call including tool name, arguments, result, and timing.",
+    "examples": [
+      {
+        "description": "Get last action",
+        "arguments": {},
+        "expected": "Last action details"
+      }
+    ],
+    "related": ["action_verify"]
+  },
+  "action_verify": {
+    "name": "action_verify",
+    "category": "meta",
+    "description": "Verify the last action completed as expected.",
+    "help": "Checks if the last action met specified criteria. Useful for scripted verification of tool results.",
+    "examples": [
+      {
+        "description": "Verify last action succeeded",
+        "arguments": {"expect_success": true, "expect_tool": "memory_read"},
+        "expected": "Verification result"
+      }
+    ],
+    "related": ["action_last"]
+  },
+  "mcp_capabilities": {
+    "name": "mcp_capabilities",
+    "category": "meta",
+    "description": "List all available tools organized by category.",
+    "help": "Returns a structured list of all available MCP tools, optionally filtered by category. Categories include: memory, module, debug, disasm, script, session, process, meta.",
+    "examples": [
+      {
+        "description": "List all capabilities",
+        "arguments": {},
+        "expected": "All tools by category"
+      },
+      {
+        "description": "List memory tools",
+        "arguments": {"category": "memory"},
+        "expected": "Memory category tools"
+      }
+    ],
+    "related": ["mcp_documentation", "mcp_version"]
+  },
+  "mcp_documentation": {
+    "name": "mcp_documentation",
+    "category": "meta",
+    "description": "Get detailed documentation and examples for a tool.",
+    "help": "Returns comprehensive documentation for a specific tool including description, usage details, examples, and related tools.",
+    "examples": [
+      {
+        "description": "Get tool documentation",
+        "arguments": {"tool": "memory_read"},
+        "expected": "Detailed documentation"
+      }
+    ],
+    "related": ["mcp_capabilities"]
+  },
+  "mcp_version": {
+    "name": "mcp_version",
+    "category": "meta",
+    "description": "Get server version and build information.",
+    "help": "Returns version information about the Ghost-MCP server including version number, protocol version, and build details.",
+    "examples": [
+      {
+        "description": "Get version",
+        "arguments": {},
+        "expected": "Version information"
+      }
+    ],
+    "related": ["mcp_health"]
+  },
+  "mcp_health": {
+    "name": "mcp_health",
+    "category": "meta",
+    "description": "Check health of all Ghost-MCP components.",
+    "help": "Performs a health check on the MCP server, agent connection, script engine, and IPC. Returns detailed status for each component and diagnostic messages.",
+    "examples": [
+      {
+        "description": "Check system health",
+        "arguments": {},
+        "expected": "Health status for all components"
+      }
+    ],
+    "related": ["mcp_version", "session_info"]
+  },
+  "session_info": {
+    "name": "session_info",
+    "category": "session",
+    "description": "Get current session status.",
+    "help": "Returns information about the current debugging session including attached process, architecture, script count, and other statistics.",
+    "examples": [
+      {
+        "description": "Get session info",
+        "arguments": {},
+        "expected": "Session details"
+      }
+    ],
+    "related": ["session_attach", "session_detach"]
+  },
+  "session_attach": {
+    "name": "session_attach",
+    "category": "session",
+    "description": "Attach to a process by name or PID.",
+    "help": "Attaches the ghost-agent to a running process. Can specify either PID or process name.",
+    "examples": [
+      {
+        "description": "Attach by PID",
+        "arguments": {"pid": 1234},
+        "expected": "Attachment confirmation"
+      },
+      {
+        "description": "Attach by name",
+        "arguments": {"name": "game.exe"},
+        "expected": "Attachment confirmation"
+      }
+    ],
+    "related": ["session_detach", "process_list"]
+  },
+  "session_detach": {
+    "name": "session_detach",
+    "category": "session",
+    "description": "Detach from the current process.",
+    "help": "Detaches the ghost-agent from the currently attached process. All hooks are removed and the process continues normally.",
+    "examples": [
+      {
+        "description": "Detach from process",
+        "arguments": {},
+        "expected": "Detachment confirmation"
+      }
+    ],
+    "related": ["session_attach", "session_info"]
+  },
+  "process_list": {
+    "name": "process_list",
+    "category": "process",
+    "description": "List running processes with optional filter.",
+    "help": "Enumerates running processes on the system. Can filter by name substring or architecture.",
+    "examples": [
+      {
+        "description": "List all processes",
+        "arguments": {},
+        "expected": "List of processes"
+      },
+      {
+        "description": "Filter by name",
+        "arguments": {"filter": "game"},
+        "expected": "Filtered process list"
+      }
+    ],
+    "related": ["session_attach", "process_spawn"]
+  },
+  "process_spawn": {
+    "name": "process_spawn",
+    "category": "process",
+    "description": "Spawn a new process with optional early injection support.",
+    "help": "Starts a new process. Can start suspended for early injection before any target code runs. Optionally injects the ghost-agent DLL after spawn.",
+    "examples": [
+      {
+        "description": "Spawn process suspended",
+        "arguments": {"path": "C:\\game\\game.exe", "suspended": true, "inject": true},
+        "expected": "Process ID and thread ID"
+      }
+    ],
+    "related": ["process_resume", "process_terminate", "session_attach"]
+  },
+  "process_resume": {
+    "name": "process_resume",
+    "category": "process",
+    "description": "Resume a suspended process.",
+    "help": "Resumes execution of a process that was started in suspended state.",
+    "examples": [
+      {
+        "description": "Resume process",
+        "arguments": {"pid": 1234},
+        "expected": "Resume confirmation"
+      }
+    ],
+    "related": ["process_spawn", "process_terminate"]
+  },
+  "process_terminate": {
+    "name": "process_terminate",
+    "category": "process",
+    "description": "Terminate a process.",
+    "help": "Terminates a running process. Can use graceful or forced termination.",
+    "examples": [
+      {
+        "description": "Terminate process",
+        "arguments": {"pid": 1234},
+        "expected": "Termination confirmation"
+      },
+      {
+        "description": "Force terminate",
+        "arguments": {"pid": 1234, "force": true},
+        "expected": "Termination confirmation"
+      }
+    ],
+    "related": ["process_spawn", "process_list"]
+  },
+  "scan_new": {
+    "name": "scan_new",
+    "category": "scanner",
+    "description": "Create a new scan session with specified options.",
+    "help": "Creates a new Cheat Engine-style scan session. Configure value type, comparison mode, alignment, and region filters. Returns a scan_id for use with subsequent scan operations. Supports multiple simultaneous scan sessions.",
+    "examples": [
+      {
+        "description": "Create session for exact i32 scan",
+        "arguments": {"value_type": "i32", "compare": "exact"},
+        "expected": "Scan ID"
+      },
+      {
+        "description": "Create session for unknown initial scan",
+        "arguments": {"value_type": "f32", "compare": "unknown"},
+        "expected": "Scan ID"
+      },
+      {
+        "description": "Create session with region filter",
+        "arguments": {"value_type": "i32", "filter": {"writable": true, "module": "game.exe"}},
+        "expected": "Scan ID"
+      }
+    ],
+    "related": ["scan_first", "scan_next", "scan_close"]
+  },
+  "scan_first": {
+    "name": "scan_first",
+    "category": "scanner",
+    "description": "Perform the initial scan to find all matching values.",
+    "help": "Executes the first scan using the options configured in scan_new. For exact scans, provide the value to search for. For unknown initial scans, all values are captured for later filtering. Returns scan statistics including result count and timing.",
+    "examples": [
+      {
+        "description": "Initial exact value scan",
+        "arguments": {"scan_id": 1, "value": "100"},
+        "expected": "Scan statistics with result count"
+      },
+      {
+        "description": "Initial unknown value scan",
+        "arguments": {"scan_id": 1},
+        "expected": "Scan statistics"
+      }
+    ],
+    "related": ["scan_new", "scan_next", "scan_results"]
+  },
+  "scan_next": {
+    "name": "scan_next",
+    "category": "scanner",
+    "description": "Perform iterative scan to filter existing results.",
+    "help": "Filters the current scan results based on a comparison. Supports: exact (new value), changed, unchanged, increased, decreased, greater, less, sameasfirst, sameasprevious, fuzzy. This is the core of iterative scanning - repeat with different comparisons to narrow down results.",
+    "examples": [
+      {
+        "description": "Filter for changed values",
+        "arguments": {"scan_id": 1, "compare": "changed"},
+        "expected": "Filtered result count"
+      },
+      {
+        "description": "Filter for increased values",
+        "arguments": {"scan_id": 1, "compare": "increased"},
+        "expected": "Filtered result count"
+      },
+      {
+        "description": "Filter for exact new value",
+        "arguments": {"scan_id": 1, "compare": "exact", "value": "95"},
+        "expected": "Filtered result count"
+      }
+    ],
+    "related": ["scan_first", "scan_results", "scan_count"]
+  },
+  "scan_results": {
+    "name": "scan_results",
+    "category": "scanner",
+    "description": "Get scan results with pagination.",
+    "help": "Retrieves the current scan results. Results include address, current value, previous value (if iterative), and first scan value. Use offset and limit for pagination on large result sets.",
+    "examples": [
+      {
+        "description": "Get first 100 results",
+        "arguments": {"scan_id": 1, "limit": 100},
+        "expected": "List of scan results"
+      },
+      {
+        "description": "Get results with pagination",
+        "arguments": {"scan_id": 1, "offset": 100, "limit": 50},
+        "expected": "Paginated results"
+      }
+    ],
+    "related": ["scan_count", "scan_first", "scan_next"]
+  },
+  "scan_count": {
+    "name": "scan_count",
+    "category": "scanner",
+    "description": "Get the current result count for a scan session.",
+    "help": "Returns just the count of results without the full result data. Useful for checking how many results remain after filtering.",
+    "examples": [
+      {
+        "description": "Get result count",
+        "arguments": {"scan_id": 1},
+        "expected": "Result count"
+      }
+    ],
+    "related": ["scan_results", "scan_next"]
+  },
+  "scan_progress": {
+    "name": "scan_progress",
+    "category": "scanner",
+    "description": "Get real-time progress of the current scan operation.",
+    "help": "Returns detailed progress information for a running scan including regions scanned, bytes processed, results found so far, and elapsed time. Useful for monitoring long-running scans.",
+    "examples": [
+      {
+        "description": "Check scan progress",
+        "arguments": {},
+        "expected": "Progress information"
+      }
+    ],
+    "related": ["scan_first", "scan_cancel"]
+  },
+  "scan_cancel": {
+    "name": "scan_cancel",
+    "category": "scanner",
+    "description": "Cancel the current scan operation.",
+    "help": "Cancels a running scan operation. Partial results up to the cancellation point are preserved.",
+    "examples": [
+      {
+        "description": "Cancel scan",
+        "arguments": {},
+        "expected": "Cancellation confirmation"
+      }
+    ],
+    "related": ["scan_progress", "scan_first"]
+  },
+  "scan_close": {
+    "name": "scan_close",
+    "category": "scanner",
+    "description": "Close a scan session and free resources.",
+    "help": "Closes an active scan session and frees all associated memory. Use when done with a scan to clean up resources.",
+    "examples": [
+      {
+        "description": "Close scan session",
+        "arguments": {"scan_id": 1},
+        "expected": "Close confirmation"
+      }
+    ],
+    "related": ["scan_new", "scan_list"]
+  },
+  "scan_list": {
+    "name": "scan_list",
+    "category": "scanner",
+    "description": "List all active scan sessions.",
+    "help": "Returns a list of all active scan sessions with their IDs, options, result counts, and status.",
+    "examples": [
+      {
+        "description": "List sessions",
+        "arguments": {},
+        "expected": "List of scan sessions"
+      }
+    ],
+    "related": ["scan_new", "scan_close"]
+  },
+  "scan_export": {
+    "name": "scan_export",
+    "category": "scanner",
+    "description": "Export scan results to JSON, CSV, or Cheat Engine XML format.",
+    "help": "Exports the current scan results to a portable format. JSON preserves all data, CSV is spreadsheet-compatible, and XML is compatible with Cheat Engine tables.",
+    "examples": [
+      {
+        "description": "Export as JSON",
+        "arguments": {"scan_id": 1, "format": "json"},
+        "expected": "JSON data string"
+      },
+      {
+        "description": "Export as CSV",
+        "arguments": {"scan_id": 1, "format": "csv"},
+        "expected": "CSV data string"
+      },
+      {
+        "description": "Export for Cheat Engine",
+        "arguments": {"scan_id": 1, "format": "xml"},
+        "expected": "CE XML data"
+      }
+    ],
+    "related": ["scan_import", "scan_results"]
+  },
+  "scan_import": {
+    "name": "scan_import",
+    "category": "scanner",
+    "description": "Import scan results from JSON data.",
+    "help": "Imports previously exported scan results into a session. Use with JSON format from scan_export.",
+    "examples": [
+      {
+        "description": "Import results",
+        "arguments": {"scan_id": 1, "data": "[{\"address\":12345,\"value\":[100,0,0,0]}]"},
+        "expected": "Import count"
+      }
+    ],
+    "related": ["scan_export", "scan_results"]
+  },
+  "exec_resolve": {
+    "name": "exec_resolve",
+    "category": "execution",
+    "description": "Resolve a function address by module and function name.",
+    "help": "Uses GetProcAddress to resolve the address of a function exported by a loaded module. The module will be loaded if not already present. Returns the resolved address that can be used with exec_call.",
+    "examples": [
+      {
+        "description": "Resolve kernel32 function",
+        "arguments": {"module": "kernel32.dll", "function": "GetCurrentProcessId"},
+        "expected": "Function address"
+      },
+      {
+        "description": "Resolve ntdll function",
+        "arguments": {"module": "ntdll.dll", "function": "NtQueryInformationProcess"},
+        "expected": "Function address"
+      }
+    ],
+    "related": ["exec_call", "exec_call_api", "symbol_resolve"]
+  },
+  "exec_call": {
+    "name": "exec_call",
+    "category": "execution",
+    "description": "Call a function at a specific address with arguments.",
+    "help": "Calls a function at the specified address with the provided arguments. Supports various calling conventions. For x64, the first 4 arguments are passed in RCX, RDX, R8, R9. Returns the function's return value.",
+    "examples": [
+      {
+        "description": "Call GetCurrentProcessId",
+        "arguments": {"address": "0x7FF8ABC12340"},
+        "expected": "Return value (PID)"
+      },
+      {
+        "description": "Call with arguments in new thread",
+        "arguments": {"address": "0x140001000", "args": [1, 2, 3], "new_thread": true, "timeout_ms": 5000},
+        "expected": "Thread exit code"
+      }
+    ],
+    "related": ["exec_resolve", "exec_call_api", "exec_shellcode"]
+  },
+  "exec_call_api": {
+    "name": "exec_call_api",
+    "category": "execution",
+    "description": "Call a Windows API function by name.",
+    "help": "Convenience function that resolves and calls a Windows API function in one step. Combines exec_resolve and exec_call functionality.",
+    "examples": [
+      {
+        "description": "Get current process ID",
+        "arguments": {"module": "kernel32.dll", "function": "GetCurrentProcessId"},
+        "expected": "Process ID"
+      },
+      {
+        "description": "Call MessageBoxA",
+        "arguments": {"module": "user32.dll", "function": "MessageBoxA", "args": [0, "Hello", "Title", 0]},
+        "expected": "Button result"
+      }
+    ],
+    "related": ["exec_resolve", "exec_call"]
+  },
+  "exec_shellcode": {
+    "name": "exec_shellcode",
+    "category": "execution",
+    "description": "Execute shellcode in the target process.",
+    "help": "Allocates RWX memory, copies shellcode, and executes it using the specified method. Supports various execution methods including direct call, new thread, APC injection, and thread hijacking. Returns the shellcode's return value.",
+    "examples": [
+      {
+        "description": "Execute simple shellcode (xor rax,rax; ret)",
+        "arguments": {"shellcode": "48 31 C0 C3"},
+        "expected": "Return value 0"
+      },
+      {
+        "description": "Execute in new thread",
+        "arguments": {"shellcode": "48 31 C0 C3", "method": "thread", "wait": true},
+        "expected": "Thread exit code"
+      }
+    ],
+    "related": ["exec_alloc", "exec_write", "exec_call"]
+  },
+  "exec_alloc": {
+    "name": "exec_alloc",
+    "category": "execution",
+    "description": "Allocate executable memory in the target process.",
+    "help": "Allocates a block of memory with the specified protection. Useful for staging shellcode or code patches. Remember to free with exec_free when done.",
+    "examples": [
+      {
+        "description": "Allocate 4KB RWX",
+        "arguments": {"size": 4096},
+        "expected": "Allocated address"
+      },
+      {
+        "description": "Allocate read-write only",
+        "arguments": {"size": 1024, "protection": "rw"},
+        "expected": "Allocated address"
+      }
+    ],
+    "related": ["exec_free", "exec_write", "exec_shellcode"]
+  },
+  "exec_free": {
+    "name": "exec_free",
+    "category": "execution",
+    "description": "Free previously allocated memory.",
+    "help": "Frees memory previously allocated with exec_alloc. Pass the address returned by exec_alloc.",
+    "examples": [
+      {
+        "description": "Free allocated memory",
+        "arguments": {"address": "0x1E0000"},
+        "expected": "Success confirmation"
+      }
+    ],
+    "related": ["exec_alloc", "exec_write"]
+  },
+  "exec_write": {
+    "name": "exec_write",
+    "category": "execution",
+    "description": "Write data to executable memory.",
+    "help": "Writes hex-encoded data to a memory address. Temporarily changes memory protection if needed. Useful for patching code or staging shellcode.",
+    "examples": [
+      {
+        "description": "Write shellcode",
+        "arguments": {"address": "0x1E0000", "data": "48 31 C0 C3"},
+        "expected": "Success confirmation"
+      }
+    ],
+    "related": ["exec_alloc", "exec_shellcode", "memory_write"]
+  },
+  "cave_find": {
+    "name": "cave_find",
+    "category": "execution",
+    "description": "Find code caves in memory.",
+    "help": "Searches for unused executable space (code caves) that can be used for placing hooks or trampolines. Looks for sequences of NOPs or zeros in executable regions.",
+    "examples": [
+      {
+        "description": "Find caves in any module",
+        "arguments": {"min_size": 64, "max_results": 10},
+        "expected": "List of code caves"
+      },
+      {
+        "description": "Find caves in specific module",
+        "arguments": {"module": "game.exe", "min_size": 128},
+        "expected": "List of caves in module"
+      }
+    ],
+    "related": ["cave_alloc", "cave_list", "exec_alloc"]
+  },
+  "cave_alloc": {
+    "name": "cave_alloc",
+    "category": "execution",
+    "description": "Allocate and reserve a code cave for use.",
+    "help": "Marks a code cave as in-use to prevent conflicts. Returns an ID for tracking. Use cave_free when done.",
+    "examples": [
+      {
+        "description": "Reserve a cave",
+        "arguments": {"address": "0x140001500", "size": 64, "description": "Hook trampoline"},
+        "expected": "Cave ID"
+      }
+    ],
+    "related": ["cave_find", "cave_free", "cave_list"]
+  },
+  "cave_free": {
+    "name": "cave_free",
+    "category": "execution",
+    "description": "Free a previously allocated code cave.",
+    "help": "Releases a code cave previously reserved with cave_alloc, making it available for reuse.",
+    "examples": [
+      {
+        "description": "Free cave",
+        "arguments": {"id": 1},
+        "expected": "Success confirmation"
+      }
+    ],
+    "related": ["cave_alloc", "cave_list"]
+  },
+  "cave_list": {
+    "name": "cave_list",
+    "category": "execution",
+    "description": "List all allocated code caves.",
+    "help": "Returns a list of all code caves currently reserved for use, including their addresses, sizes, and descriptions.",
+    "examples": [
+      {
+        "description": "List caves",
+        "arguments": {},
+        "expected": "List of allocated caves"
+      }
+    ],
+    "related": ["cave_find", "cave_alloc", "cave_free"]
+  },
+  "syscall_number": {
+    "name": "syscall_number",
+    "category": "execution",
+    "description": "Get the syscall number for an ntdll function.",
+    "help": "Extracts the syscall number from an ntdll function's stub. Useful for direct syscall invocation to bypass user-mode hooks.",
+    "examples": [
+      {
+        "description": "Get NtQueryInformationProcess syscall",
+        "arguments": {"function": "NtQueryInformationProcess"},
+        "expected": "Syscall number"
+      },
+      {
+        "description": "Get NtAllocateVirtualMemory syscall",
+        "arguments": {"function": "NtAllocateVirtualMemory"},
+        "expected": "Syscall number"
+      }
+    ],
+    "related": ["syscall_invoke", "exec_resolve"]
+  },
+  "syscall_invoke": {
+    "name": "syscall_invoke",
+    "category": "execution",
+    "description": "Invoke a syscall directly (bypasses user-mode hooks).",
+    "help": "Executes a syscall directly using the syscall instruction, bypassing any ntdll hooks. Requires the syscall number from syscall_number. Note: This is an advanced feature.",
+    "examples": [
+      {
+        "description": "Direct syscall",
+        "arguments": {"number": 25, "args": [0, 0, 0, 0]},
+        "expected": "NTSTATUS result"
+      }
+    ],
+    "related": ["syscall_number", "exec_call"]
+  },
+  "remote_thread": {
+    "name": "remote_thread",
+    "category": "execution",
+    "description": "Create a remote thread in another process.",
+    "help": "Creates a thread in a target process to execute code at the specified address. Useful for DLL injection or executing shellcode in another process.",
+    "examples": [
+      {
+        "description": "Create remote thread",
+        "arguments": {"pid": 1234, "address": "0x7FF8ABC10000", "parameter": 0},
+        "expected": "Thread ID"
+      },
+      {
+        "description": "Create and wait",
+        "arguments": {"pid": 1234, "address": "0x7FF8ABC10000", "wait": true},
+        "expected": "Exit code"
+      }
+    ],
+    "related": ["remote_apc", "exec_shellcode", "process_list"]
+  },
+  "remote_apc": {
+    "name": "remote_apc",
+    "category": "execution",
+    "description": "Queue an APC to a thread in another process.",
+    "help": "Queues an Asynchronous Procedure Call to a thread in another process. The APC will execute when the thread enters an alertable wait state. More stealthy than CreateRemoteThread.",
+    "examples": [
+      {
+        "description": "Queue APC",
+        "arguments": {"pid": 1234, "tid": 5678, "address": "0x7FF8ABC10000", "parameter": 0},
+        "expected": "Success confirmation"
+      }
+    ],
+    "related": ["remote_thread", "exec_shellcode"]
+  },
+  "command_batch": {
+    "name": "command_batch",
+    "category": "command",
+    "description": "Execute multiple commands as a batch sequence with optional conditions.",
+    "help": "Executes a sequence of commands in order, with support for conditions, error handling, and transactions. Commands can reference previous command results via labels. Useful for complex multi-step operations like 'find value, set breakpoint, wait for hit, read registers'.",
+    "examples": [
+      {
+        "description": "Simple batch",
+        "arguments": {"name": "Find and read", "commands": [{"tool": "memory_search", "arguments": {"value": "100", "type": "i32"}, "label": "search"}, {"tool": "memory_read", "arguments": {"address": "0x140001000", "size": 16}}]},
+        "expected": "Sequence result with individual command results"
+      },
+      {
+        "description": "Conditional batch",
+        "arguments": {"name": "Conditional ops", "commands": [{"tool": "module_list", "label": "modules"}, {"tool": "module_exports", "arguments": {"module": "kernel32.dll"}, "condition": "previous_success"}], "transactional": false},
+        "expected": "Sequence with conditional execution"
+      }
+    ],
+    "related": ["command_history", "command_replay"]
+  },
+  "command_history": {
+    "name": "command_history",
+    "category": "command",
+    "description": "Query command execution history.",
+    "help": "Retrieves a history of previously executed commands with their arguments and results. Useful for replaying commands or reviewing what was done during a session.",
+    "examples": [
+      {
+        "description": "Get recent history",
+        "arguments": {"limit": 10},
+        "expected": "List of recent commands"
+      },
+      {
+        "description": "Filter by tool",
+        "arguments": {"tool": "memory_read", "limit": 20},
+        "expected": "Memory read commands only"
+      }
+    ],
+    "related": ["command_batch", "command_replay", "action_last"]
+  },
+  "command_replay": {
+    "name": "command_replay",
+    "category": "command",
+    "description": "Replay a command from history by ID.",
+    "help": "Re-executes a command from history, optionally with modified arguments. Useful for repeating operations or testing variations.",
+    "examples": [
+      {
+        "description": "Replay exact",
+        "arguments": {"id": 42},
+        "expected": "Command result"
+      },
+      {
+        "description": "Replay with changes",
+        "arguments": {"id": 42, "modify_args": {"size": 32}},
+        "expected": "Command result with modified args"
+      }
+    ],
+    "related": ["command_history", "command_batch"]
+  },
+  "event_subscribe": {
+    "name": "event_subscribe",
+    "category": "event",
+    "description": "Subscribe to agent events (breakpoints, exceptions, memory changes, hooks).",
+    "help": "Creates a subscription to receive events from the agent. Events are buffered and can be polled using event_poll. Useful for monitoring breakpoint hits, exceptions, hook triggers, and other async events.",
+    "examples": [
+      {
+        "description": "Subscribe to all",
+        "arguments": {"events": ["all"], "buffer_size": 100},
+        "expected": "Subscription ID"
+      },
+      {
+        "description": "Breakpoints only",
+        "arguments": {"events": ["breakpoint", "exception"]},
+        "expected": "Subscription ID"
+      }
+    ],
+    "related": ["event_poll", "event_unsubscribe", "event_list"]
+  },
+  "event_unsubscribe": {
+    "name": "event_unsubscribe",
+    "category": "event",
+    "description": "Unsubscribe from events.",
+    "help": "Cancels an event subscription and clears any buffered events.",
+    "examples": [
+      {
+        "description": "Cancel subscription",
+        "arguments": {"subscription_id": 1},
+        "expected": "Confirmation"
+      }
+    ],
+    "related": ["event_subscribe", "event_list"]
+  },
+  "event_poll": {
+    "name": "event_poll",
+    "category": "event",
+    "description": "Poll for buffered events from a subscription.",
+    "help": "Retrieves events that have been buffered for a subscription. By default, events are cleared after reading. Returns event details including type, timestamp, and context (registers, stack, etc.).",
+    "examples": [
+      {
+        "description": "Poll events",
+        "arguments": {"subscription_id": 1, "limit": 10},
+        "expected": "List of events"
+      },
+      {
+        "description": "Peek without clearing",
+        "arguments": {"subscription_id": 1, "clear": false},
+        "expected": "Events remain in buffer"
+      }
+    ],
+    "related": ["event_subscribe", "event_list"]
+  },
+  "event_list": {
+    "name": "event_list",
+    "category": "event",
+    "description": "List active event subscriptions.",
+    "help": "Returns a list of all active event subscriptions with their configuration and buffer status.",
+    "examples": [
+      {
+        "description": "List subscriptions",
+        "arguments": {},
+        "expected": "List of active subscriptions"
+      }
+    ],
+    "related": ["event_subscribe", "event_unsubscribe"]
+  },
+  "ai_summarize": {
+    "name": "ai_summarize",
+    "category": "ai",
+    "description": "Generate an AI-friendly summary of the last operation or specified data.",
+    "help": "Creates a structured summary suitable for AI consumption, including key findings, observations, and suggested next steps. Useful for understanding complex results.",
+    "examples": [
+      {
+        "description": "Summarize last action",
+        "arguments": {},
+        "expected": "Structured summary"
+      },
+      {
+        "description": "Summarize with context",
+        "arguments": {"context": "vulnerability analysis"},
+        "expected": "Context-aware summary"
+      }
+    ],
+    "related": ["ai_diff", "ai_explain_error", "action_last"]
+  },
+  "ai_diff": {
+    "name": "ai_diff",
+    "category": "ai",
+    "description": "Generate a diff report comparing two states.",
+    "help": "Compares two states (memory, registers, modules, etc.) and produces a structured diff report showing additions, removals, and modifications.",
+    "examples": [
+      {
+        "description": "Compare registers",
+        "arguments": {"type": "registers", "before_snapshot": 1, "after_snapshot": 2},
+        "expected": "Register diff report"
+      },
+      {
+        "description": "Memory diff",
+        "arguments": {"type": "memory", "before": {"address": "0x1000", "bytes": "00112233"}, "after": {"address": "0x1000", "bytes": "44556677"}},
+        "expected": "Memory change report"
+      }
+    ],
+    "related": ["ai_summarize", "memory_read"]
+  },
+  "ai_explain_error": {
+    "name": "ai_explain_error",
+    "category": "ai",
+    "description": "Get a detailed AI-friendly explanation of an error.",
+    "help": "Provides a comprehensive explanation of an error, including possible causes, suggested fixes, and relevant documentation links.",
+    "examples": [
+      {
+        "description": "Explain access violation",
+        "arguments": {"error": "Access violation reading 0x0000000000000000", "context": "Trying to read player health"},
+        "expected": "Detailed explanation with suggestions"
+      }
+    ],
+    "related": ["ai_summarize", "mcp_documentation"]
+  },
+  "debug_session_create": {
+    "name": "debug_session_create",
+    "category": "ai",
+    "description": "Create a new AI-assisted debugging session.",
+    "help": "Creates a conversational debugging session that tracks findings, hypotheses, and progress toward a goal. The session maintains context across multiple tool calls.",
+    "examples": [
+      {
+        "description": "Start session",
+        "arguments": {"name": "Find health value", "goal": "Locate the player health variable in memory"},
+        "expected": "Session ID and initial state"
+      }
+    ],
+    "related": ["debug_session_info", "debug_session_update", "debug_session_close"]
+  },
+  "debug_session_info": {
+    "name": "debug_session_info",
+    "category": "ai",
+    "description": "Get current debugging session state and findings.",
+    "help": "Returns the complete state of a debugging session including findings, hypotheses, recommended next steps, and context.",
+    "examples": [
+      {
+        "description": "Get session info",
+        "arguments": {"session_id": 1},
+        "expected": "Full session state"
+      }
+    ],
+    "related": ["debug_session_create", "debug_session_update"]
+  },
+  "debug_session_update": {
+    "name": "debug_session_update",
+    "category": "ai",
+    "description": "Update the debugging session with new findings or hypotheses.",
+    "help": "Adds new findings, hypotheses, or context to a debugging session. Findings are observations made during analysis. Hypotheses are theories to test.",
+    "examples": [
+      {
+        "description": "Add finding",
+        "arguments": {"session_id": 1, "finding": {"type": "memory_pattern", "description": "Found health value at 0x140050000", "addresses": [5368979456], "confidence": 0.9}},
+        "expected": "Updated session"
+      }
+    ],
+    "related": ["debug_session_info", "debug_session_create"]
+  },
+  "debug_session_close": {
+    "name": "debug_session_close",
+    "category": "ai",
+    "description": "Close a debugging session.",
+    "help": "Closes a debugging session and optionally saves the findings. The session data remains available for reference.",
+    "examples": [
+      {
+        "description": "Close session",
+        "arguments": {"session_id": 1},
+        "expected": "Session summary"
+      }
+    ],
+    "related": ["debug_session_create", "debug_session_list"]
+  },
+  "debug_session_list": {
+    "name": "debug_session_list",
+    "category": "ai",
+    "description": "List all debugging sessions.",
+    "help": "Returns a list of all debugging sessions (active and closed) with their status and summary.",
+    "examples": [
+      {
+        "description": "List sessions",
+        "arguments": {},
+        "expected": "List of sessions"
+      }
+    ],
+    "related": ["debug_session_create", "debug_session_info"]
+  },
+  "ai_recommend_breakpoints": {
+    "name": "ai_recommend_breakpoints",
+    "category": "ai",
+    "description": "Get AI recommendations for breakpoint locations based on analysis goal.",
+    "help": "Analyzes the target module and suggests optimal breakpoint locations based on the analysis goal. Considers imports, exports, strings, and code patterns.",
+    "examples": [
+      {
+        "description": "Find health breakpoints",
+        "arguments": {"goal": "Find where health is modified", "module": "game.exe", "limit": 5},
+        "expected": "List of recommended breakpoint addresses with rationale"
+      }
+    ],
+    "related": ["breakpoint_set", "debug_session_create", "ai_analyze_vulnerability"]
+  },
+  "ai_analyze_vulnerability": {
+    "name": "ai_analyze_vulnerability",
+    "category": "ai",
+    "description": "Analyze a code location for potential vulnerabilities.",
+    "help": "Performs static analysis around the specified address looking for common vulnerability patterns like buffer overflows, format strings, use-after-free, etc.",
+    "examples": [
+      {
+        "description": "Analyze function",
+        "arguments": {"address": "0x140001000", "context_size": 100},
+        "expected": "Vulnerability report"
+      }
+    ],
+    "related": ["disasm_function", "debug_session_update", "ai_recommend_breakpoints"]
+  },
+  "ai_learn_pattern": {
+    "name": "ai_learn_pattern",
+    "category": "ai",
+    "description": "Learn and save a pattern from user actions for future reference.",
+    "help": "Saves a pattern (code sequence, behavior, data structure, etc.) that was discovered during analysis. Patterns can be recalled later for similar analyses.",
+    "examples": [
+      {
+        "description": "Save code pattern",
+        "arguments": {"name": "Health decrement", "description": "Pattern that decrements health value", "type": "code_sequence", "data": {"pattern": "48 83 E8 01", "context": "sub rax, 1"}},
+        "expected": "Pattern saved with ID"
+      }
+    ],
+    "related": ["ai_patterns_list", "debug_session_update"]
+  },
+  "ai_patterns_list": {
+    "name": "ai_patterns_list",
+    "category": "ai",
+    "description": "List learned patterns.",
+    "help": "Returns all saved patterns, optionally filtered by type. Patterns can be used to recognize similar code or behavior in future analyses.",
+    "examples": [
+      {
+        "description": "List all patterns",
+        "arguments": {},
+        "expected": "List of patterns"
+      },
+      {
+        "description": "Filter by type",
+        "arguments": {"type": "code_sequence"},
+        "expected": "Code sequence patterns only"
+      }
+    ],
+    "related": ["ai_learn_pattern", "memory_search_pattern"]
+  },
+  "trace_session_create": {
+    "name": "trace_session_create",
+    "category": "api_trace",
+    "description": "Create a new API call trace session.",
+    "help": "Creates a trace session for capturing Win32 API calls. Configure buffer size, stack capture depth, and whether to capture call durations and output parameters. Similar to Rohitab API Monitor.",
+    "examples": [
+      {
+        "description": "Create default session",
+        "arguments": {},
+        "expected": "Session ID"
+      },
+      {
+        "description": "Create with custom config",
+        "arguments": {"name": "file_ops", "max_events": 50000, "stack_depth": 8},
+        "expected": "Session ID with custom configuration"
+      }
+    ],
+    "related": ["trace_session_start", "trace_session_list", "trace_filter_set"]
+  },
+  "trace_control": {
+    "name": "trace_control",
+    "category": "api_trace",
+    "description": "Control trace capture with a consolidated action (start, stop, pause, resume).",
+    "help": "Maps consolidated trace actions to the appropriate session control commands. Use it to start, stop, pause, or resume an existing trace_session.",
+    "examples": [
+      {
+        "description": "Start tracing",
+        "arguments": {"action": "start", "session_id": 1},
+        "expected": "Session started"
+      },
+      {
+        "description": "Pause tracing",
+        "arguments": {"action": "pause", "session_id": 1},
+        "expected": "Session paused"
+      }
+    ],
+    "related": ["trace_session_start", "trace_session_stop", "trace_session_pause", "trace_session_resume"]
+  },
+  "trace_session_start": {
+    "name": "trace_session_start",
+    "category": "api_trace",
+    "description": "Start capturing API calls for a session.",
+    "help": "Begins API call capture. Hooks are installed for APIs matching the session's filter and loaded API packs.",
+    "examples": [
+      {
+        "description": "Start tracing",
+        "arguments": {"session_id": 1},
+        "expected": "Session started with hook count"
+      }
+    ],
+    "related": ["trace_session_create", "trace_session_stop", "trace_events"]
+  },
+  "trace_session_stop": {
+    "name": "trace_session_stop",
+    "category": "api_trace",
+    "description": "Stop capturing API calls.",
+    "help": "Stops API call capture and removes hooks. Captured events remain in the buffer for retrieval.",
+    "examples": [
+      {
+        "description": "Stop tracing",
+        "arguments": {"session_id": 1},
+        "expected": "Session stopped"
+      }
+    ],
+    "related": ["trace_session_start", "trace_session_close", "trace_events"]
+  },
+  "trace_session_pause": {
+    "name": "trace_session_pause",
+    "category": "api_trace",
+    "description": "Pause API call capture temporarily.",
+    "help": "Pauses capture without removing hooks. Can be resumed quickly.",
+    "examples": [
+      {
+        "description": "Pause tracing",
+        "arguments": {"session_id": 1},
+        "expected": "Session paused"
+      }
+    ],
+    "related": ["trace_session_resume", "trace_session_stop"]
+  },
+  "trace_session_resume": {
+    "name": "trace_session_resume",
+    "category": "api_trace",
+    "description": "Resume a paused trace session.",
+    "help": "Resumes capture for a paused session.",
+    "examples": [
+      {
+        "description": "Resume tracing",
+        "arguments": {"session_id": 1},
+        "expected": "Session resumed"
+      }
+    ],
+    "related": ["trace_session_pause", "trace_session_start"]
+  },
+  "trace_session_close": {
+    "name": "trace_session_close",
+    "category": "api_trace",
+    "description": "Close and cleanup a trace session.",
+    "help": "Stops capture, removes hooks, and frees all resources for the session.",
+    "examples": [
+      {
+        "description": "Close session",
+        "arguments": {"session_id": 1},
+        "expected": "Session closed"
+      }
+    ],
+    "related": ["trace_session_create", "trace_session_stop"]
+  },
+  "trace_session_list": {
+    "name": "trace_session_list",
+    "category": "api_trace",
+    "description": "List all trace sessions.",
+    "help": "Returns all trace sessions with their current state and statistics.",
+    "examples": [
+      {
+        "description": "List sessions",
+        "arguments": {},
+        "expected": "Array of session info objects"
+      }
+    ],
+    "related": ["trace_session_create", "trace_session_info"]
+  },
+  "trace_session_info": {
+    "name": "trace_session_info",
+    "category": "api_trace",
+    "description": "Get detailed information about a trace session.",
+    "help": "Returns comprehensive session info including state, configuration, statistics, and installed hooks.",
+    "examples": [
+      {
+        "description": "Get session details",
+        "arguments": {"session_id": 1},
+        "expected": "Detailed session information"
+      }
+    ],
+    "related": ["trace_session_list", "trace_stats"]
+  },
+  "trace_events": {
+    "name": "trace_events",
+    "category": "api_trace",
+    "description": "Get captured API call events.",
+    "help": "Retrieves captured API call events with full argument decoding. Supports pagination for large result sets.",
+    "examples": [
+      {
+        "description": "Get recent events",
+        "arguments": {"session_id": 1, "count": 50},
+        "expected": "Array of API call events"
+      },
+      {
+        "description": "Paginated retrieval",
+        "arguments": {"session_id": 1, "count": 100, "offset": 200},
+        "expected": "Events 200-299"
+      }
+    ],
+    "related": ["trace_session_start", "trace_events_clear", "trace_stats"]
+  },
+  "trace_events_clear": {
+    "name": "trace_events_clear",
+    "category": "api_trace",
+    "description": "Clear captured events from buffer.",
+    "help": "Clears all events from the session's ring buffer without stopping capture.",
+    "examples": [
+      {
+        "description": "Clear buffer",
+        "arguments": {"session_id": 1},
+        "expected": "Buffer cleared"
+      }
+    ],
+    "related": ["trace_events", "trace_session_stop"]
+  },
+  "trace_stats": {
+    "name": "trace_stats",
+    "category": "api_trace",
+    "description": "Get trace session statistics.",
+    "help": "Returns per-API call counts, average durations, success/failure rates, and per-module/thread breakdown.",
+    "examples": [
+      {
+        "description": "Get statistics",
+        "arguments": {"session_id": 1},
+        "expected": "Comprehensive statistics object"
+      }
+    ],
+    "related": ["trace_events", "trace_queue_stats"]
+  },
+  "trace_queue_stats": {
+    "name": "trace_queue_stats",
+    "category": "api_trace",
+    "description": "Get event queue statistics.",
+    "help": "Returns queue depth, total captured, dropped events, and events per second rate.",
+    "examples": [
+      {
+        "description": "Check queue health",
+        "arguments": {"session_id": 1},
+        "expected": "Queue statistics"
+      }
+    ],
+    "related": ["trace_stats", "trace_session_info"]
+  },
+  "trace_filter_set": {
+    "name": "trace_filter_set",
+    "category": "api_trace",
+    "description": "Set filter for a trace session.",
+    "help": "Configure which APIs to capture using include/exclude patterns for API names, modules, and threads. Supports prefix:, suffix:, contains:, regex: patterns.",
+    "examples": [
+      {
+        "description": "Filter to file APIs",
+        "arguments": {"session_id": 1, "include_apis": ["prefix:Create", "prefix:Read", "prefix:Write"]},
+        "expected": "Filter applied"
+      },
+      {
+        "description": "Exclude noisy APIs",
+        "arguments": {"session_id": 1, "exclude_apis": ["GetTickCount", "QueryPerformanceCounter"]},
+        "expected": "Filter applied"
+      }
+    ],
+    "related": ["trace_preset_apply", "trace_preset_list"]
+  },
+  "trace_preset_list": {
+    "name": "trace_preset_list",
+    "category": "api_trace",
+    "description": "List available filter presets.",
+    "help": "Returns built-in and custom filter presets. Built-in presets include File Operations, Network Operations, Registry Operations, and Errors Only.",
+    "examples": [
+      {
+        "description": "List presets",
+        "arguments": {},
+        "expected": "Array of preset objects"
+      }
+    ],
+    "related": ["trace_preset_apply", "trace_preset_create"]
+  },
+  "trace_preset_apply": {
+    "name": "trace_preset_apply",
+    "category": "api_trace",
+    "description": "Apply a filter preset to a session.",
+    "help": "Applies a saved filter preset to the session, replacing any existing filter.",
+    "examples": [
+      {
+        "description": "Apply file ops preset",
+        "arguments": {"session_id": 1, "preset_id": 1},
+        "expected": "Preset applied"
+      }
+    ],
+    "related": ["trace_preset_list", "trace_filter_set"]
+  },
+  "trace_preset_create": {
+    "name": "trace_preset_create",
+    "category": "api_trace",
+    "description": "Create a new filter preset.",
+    "help": "Saves a filter configuration as a named preset for reuse.",
+    "examples": [
+      {
+        "description": "Create custom preset",
+        "arguments": {"name": "Memory APIs", "description": "VirtualAlloc/Free calls", "filter": {"include_apis": ["VirtualAlloc", "VirtualFree"]}},
+        "expected": "Preset ID"
+      }
+    ],
+    "related": ["trace_preset_list", "trace_preset_delete"]
+  },
+  "trace_preset_delete": {
+    "name": "trace_preset_delete",
+    "category": "api_trace",
+    "description": "Delete a custom filter preset.",
+    "help": "Deletes a user-created preset. Built-in presets cannot be deleted.",
+    "examples": [
+      {
+        "description": "Delete preset",
+        "arguments": {"preset_id": 5},
+        "expected": "Preset deleted"
+      }
+    ],
+    "related": ["trace_preset_list", "trace_preset_create"]
+  },
+  "trace_pack_list": {
+    "name": "trace_pack_list",
+    "category": "api_trace",
+    "description": "List available API definition packs.",
+    "help": "Returns loaded API definition packs. Built-in packs include kernel32, user32, ntdll, ws2_32, and advapi32.",
+    "examples": [
+      {
+        "description": "List packs",
+        "arguments": {},
+        "expected": "Array of pack info"
+      }
+    ],
+    "related": ["trace_pack_info", "trace_pack_load"]
+  },
+  "trace_pack_info": {
+    "name": "trace_pack_info",
+    "category": "api_trace",
+    "description": "Get detailed info about an API pack.",
+    "help": "Returns pack details including function definitions, struct definitions, and enum definitions.",
+    "examples": [
+      {
+        "description": "Get kernel32 info",
+        "arguments": {"pack_id": "kernel32"},
+        "expected": "Pack details with function list"
+      }
+    ],
+    "related": ["trace_pack_list", "trace_pack_load"]
+  },
+  "trace_pack_load": {
+    "name": "trace_pack_load",
+    "category": "api_trace",
+    "description": "Load a custom API definition pack.",
+    "help": "Loads API definitions from a JSON file. Custom packs extend tracing to additional APIs.",
+    "examples": [
+      {
+        "description": "Load custom pack",
+        "arguments": {"path": "C:\\packs\\custom_apis.json"},
+        "expected": "Pack loaded with ID"
+      }
+    ],
+    "related": ["trace_pack_list", "trace_pack_unload"]
+  },
+  "trace_pack_unload": {
+    "name": "trace_pack_unload",
+    "category": "api_trace",
+    "description": "Unload a custom API pack.",
+    "help": "Unloads a custom API pack. Built-in packs cannot be unloaded.",
+    "examples": [
+      {
+        "description": "Unload pack",
+        "arguments": {"pack_id": "custom_apis"},
+        "expected": "Pack unloaded"
+      }
+    ],
+    "related": ["trace_pack_load", "trace_pack_list"]
+  },
+  "trace_hooks_list": {
+    "name": "trace_hooks_list",
+    "category": "api_trace",
+    "description": "List installed API hooks for a session.",
+    "help": "Returns all installed hooks with their status, addresses, and call counts.",
+    "examples": [
+      {
+        "description": "List hooks",
+        "arguments": {"session_id": 1},
+        "expected": "Array of hook status objects"
+      }
+    ],
+    "related": ["trace_session_start", "trace_session_info"]
+  }
+}

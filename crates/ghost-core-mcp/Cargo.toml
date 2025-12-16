@@ -1,0 +1,46 @@
+[package]
+name = "ghost-core-mcp"
+version.workspace = true
+edition.workspace = true
+description = "Ghost-MCP Core Runtime Server - Port 13340, 85 tools for live process interaction"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "ghost-core-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "ghost_core_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+# Internal crates
+ghost-common = { path = "../ghost-common" }
+ghost-mcp-common = { path = "../ghost-mcp-common" }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Logging/tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = "1.0"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Disassembly (local tools)
+capstone = { workspace = true }
+hex = "0.4"
+
+[dev-dependencies]
+tokio-test = "0.4"
