@@ -666,7 +666,37 @@ async fn handle_client(
                     }
                     _ => {
                         // Delegate to backend handler (capabilities keyed by session_id)
-                        handler.handle(&request, Some(&session_id))
+                        // Offload to blocking thread to prevent hanging the async runtime
+                        let handler = Arc::clone(&handler);
+                        let request = request.clone();
+                        let request_id = request.id; // Save id before moving request
+                        let session_id = session_id.clone();
+
+                        let response_future = tokio::task::spawn_blocking(move || {
+                            handler.handle(&request, Some(&session_id))
+                        });
+
+                        // Set a reasonable timeout (30s) to prevent indefinite hanging
+                        match tokio::time::timeout(
+                            std::time::Duration::from_secs(30),
+                            response_future,
+                        )
+                        .await
+                        {
+                            Ok(Ok(response)) => response,
+                            Ok(Err(e)) => {
+                                error!(target: "ghost_agent::ipc", error = %e, "Handler task failed");
+                                Response::error(
+                                    request_id,
+                                    -32603,
+                                    format!("Handler task failed: {}", e),
+                                )
+                            }
+                            Err(_) => {
+                                warn!(target: "ghost_agent::ipc", "Handler timed out");
+                                Response::error(request_id, -32603, "Handler timed out")
+                            }
+                        }
                     }
                 };
 
