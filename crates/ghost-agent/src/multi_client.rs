@@ -558,8 +558,8 @@ async fn handle_client(
         }
     };
 
-    // Subscribe all clients to the event bus (no separate "events" capability required)
-    let mut event_rx = Some(event_bus.subscribe());
+    // Do not auto-subscribe clients to events; subscribe on explicit request
+    let mut event_rx: Option<tokio::sync::broadcast::Receiver<Event>> = None;
 
     // Split stream for concurrent read/write
     let (mut reader, mut writer) = stream.into_split();

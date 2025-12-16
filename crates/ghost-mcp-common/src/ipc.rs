@@ -410,25 +410,25 @@ impl AgentClient {
                 McpError::AgentNotConnected
             })?
         };
-        
+
         // Timeout on mutex acquisition - prevents hanging if another request holds the lock
         // Use a separate shorter timeout for lock acquisition (10% of total or 5s max)
-        let lock_timeout_ms = (self.config.timeout_ms / 10).max(1000).min(5000);
+        let lock_timeout_ms = (self.config.timeout_ms / 10).clamp(1000, 5000);
         let lock_timeout = Duration::from_millis(lock_timeout_ms);
-        
+
         let mut stream = timeout(lock_timeout, stream_arc.lock_owned())
             .await
             .map_err(|_| {
                 warn!(
-                    target: "ghost_mcp::ipc", 
-                    method = %method, 
+                    target: "ghost_mcp::ipc",
+                    method = %method,
                     id = request.id,
                     lock_timeout_ms = lock_timeout_ms,
                     "Timeout waiting for stream lock - possible deadlock or slow request"
                 );
                 McpError::Timeout(lock_timeout_ms)
             })?;
-        
+
         debug!(target: "ghost_mcp::ipc", method = %method, id = request.id, "Stream lock acquired");
 
         // Write with timeout
@@ -580,7 +580,7 @@ impl AgentClient {
     }
 
     /// Start heartbeat task
-    /// 
+    ///
     /// The heartbeat task monitors connection health by sending periodic pings.
     /// On failure, it marks the connection as disconnected but does NOT attempt
     /// to reconnect - reconnection is handled by `request_with_reconnect()` to
@@ -590,7 +590,7 @@ impl AgentClient {
         let heartbeat_timeout = Duration::from_millis(self.config.heartbeat.timeout_ms);
         let max_failures = self.config.heartbeat.max_failures;
         let client = self.clone();
-        
+
         debug!(
             target: "ghost_mcp::ipc",
             interval_ms = self.config.heartbeat.interval_ms,
@@ -605,7 +605,7 @@ impl AgentClient {
 
             loop {
                 tokio::time::sleep(interval).await;
-                
+
                 // Check if we should still be running (connection might be intentionally closed)
                 if !client.connected.load(Ordering::SeqCst) {
                     debug!(target: "ghost_mcp::ipc", "Heartbeat stopping: connection marked as disconnected");
@@ -720,7 +720,7 @@ impl AgentClient {
     }
 
     /// Stop heartbeat task
-    /// 
+    ///
     /// Cleanly stops the heartbeat task by aborting the spawned task.
     /// This is called during disconnect/reconnect to ensure no orphaned tasks.
     async fn stop_heartbeat(&self) {
@@ -1107,22 +1107,20 @@ mod tests {
     #[test]
     fn test_lock_timeout_calculation() {
         // Test the lock timeout calculation: 10% of total, min 1s, max 5s
-        let calc_lock_timeout = |timeout_ms: u64| -> u64 {
-            (timeout_ms / 10).max(1000).min(5000)
-        };
+        let calc_lock_timeout = |timeout_ms: u64| -> u64 { (timeout_ms / 10).clamp(1000, 5000) };
 
         // 30s timeout -> 3s lock timeout
         assert_eq!(calc_lock_timeout(30000), 3000);
-        
+
         // 5s timeout -> 1s lock timeout (minimum)
         assert_eq!(calc_lock_timeout(5000), 1000);
-        
+
         // 1s timeout -> 1s lock timeout (minimum kicks in)
         assert_eq!(calc_lock_timeout(1000), 1000);
-        
+
         // 100s timeout -> 5s lock timeout (maximum)
         assert_eq!(calc_lock_timeout(100000), 5000);
-        
+
         // 60s timeout -> 5s lock timeout (maximum kicks in)
         assert_eq!(calc_lock_timeout(60000), 5000);
     }
@@ -1179,7 +1177,7 @@ mod tests {
             failures: 0,
             last_error: None,
         };
-        
+
         // Should have a very small duration since we just created it
         let duration = health.time_since_ping();
         assert!(duration.is_some());
