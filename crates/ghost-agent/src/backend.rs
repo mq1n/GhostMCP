@@ -12,6 +12,7 @@ use ghost_common::ipc::{
 use ghost_common::{
     Breakpoint, BreakpointId, BreakpointType, CallingConvention, CodeCave, CodeCaveOptions, Error,
     Export, FunctionArg, FunctionCallOptions, HookId, Import, Instruction, MemoryRegion, Module,
+    PointerExportFormat, PointerPath, PointerRescanOptions, PointerScanId, PointerScanOptions,
     RegionFilter, Registers, Result, ScanCompareType, ScanExportFormat, ScanId, ScanOptions,
     ScanResult, ShellcodeExecMethod, ShellcodeExecOptions, StackFrame, Thread, ValueType,
 };
@@ -19,7 +20,8 @@ use ghost_core::execution::ExecutionEngine;
 use ghost_core::{
     advanced_monitor::{ChillManager, ComScanner, DllMonitor, DynamicApiMonitor},
     api_trace::ApiTracer,
-    CodeInjection, Debugging, GhostBackend, MemoryAccess, ProcessControl, Scanner, StaticAnalysis,
+    CodeInjection, Debugging, GhostBackend, MemoryAccess, PointerScanner, ProcessControl, Scanner,
+    StaticAnalysis,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -277,6 +279,8 @@ pub struct InProcessBackend {
     com_scanner: RwLock<ComScanner>,
     /// DLL Monitor
     dll_monitor: RwLock<DllMonitor>,
+    /// Pointer Scanner
+    pointer_scanner: PointerScanner,
 }
 
 #[allow(dead_code)]
@@ -394,6 +398,7 @@ impl InProcessBackend {
             chill_manager: RwLock::new(ChillManager::new(Default::default())),
             com_scanner: RwLock::new(ComScanner::new(Default::default())),
             dll_monitor: RwLock::new(DllMonitor::new(Default::default())),
+            pointer_scanner: PointerScanner::new(),
         };
 
         // Initial module enumeration
@@ -657,6 +662,9 @@ impl InProcessBackend {
         }
         if method.starts_with("dynamic_api_") {
             return self.dispatch_dynamic_api_method(method, request);
+        }
+        if method.starts_with("pointer_") {
+            return self.dispatch_pointer_method(method, request);
         }
 
         match method {
@@ -1929,6 +1937,603 @@ impl InProcessBackend {
                 method
             ))),
         }
+    }
+
+    /// Pointer scanner method dispatcher with defensive validation and comprehensive logging.
+    ///
+    /// All pointer operations include:
+    /// - Input validation with bounds checking
+    /// - Defensive error handling
+    /// - Comprehensive tracing for debugging
+    /// - Safe defaults for optional parameters
+    fn dispatch_pointer_method(
+        &self,
+        method: &str,
+        request: &Request,
+    ) -> Result<serde_json::Value> {
+        // Defensive: validate method name length
+        if method.len() > 64 {
+            tracing::warn!(target: "ghost_agent::backend::pointer", method_len = method.len(), "Pointer method name too long");
+            return Err(Error::Internal("Method name too long".into()));
+        }
+
+        tracing::debug!(target: "ghost_agent::backend::pointer", method = method, "Dispatching pointer method");
+
+        match method {
+            "pointer_scan_create" => {
+                let address = parse_address(&request.params["address"])?;
+
+                // Defensive: validate address is not null region
+                if address < 0x10000 {
+                    tracing::warn!(target: "ghost_agent::backend::pointer", address = format!("0x{:x}", address), "Target address in null region");
+                    return Err(Error::Internal(format!(
+                        "Target address 0x{:x} is in null/reserved region (< 0x10000)",
+                        address
+                    )));
+                }
+
+                // Defensive: clamp max_offset to reasonable bounds (1 to 1MB)
+                let max_offset = request.params["max_offset"]
+                    .as_i64()
+                    .unwrap_or(4096)
+                    .clamp(1, 1024 * 1024);
+
+                // Defensive: clamp max_level to reasonable bounds (1 to 10)
+                let max_level = request.params["max_level"]
+                    .as_u64()
+                    .unwrap_or(5)
+                    .clamp(1, 10) as u32;
+
+                let options = PointerScanOptions {
+                    target_address: address,
+                    max_depth: max_level,
+                    max_offset,
+                    ..Default::default()
+                };
+
+                let scan_id = self.pointer_scanner.create_session(options)?;
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    address = format!("0x{:x}", address),
+                    max_offset = max_offset,
+                    max_level = max_level,
+                    "Created pointer scan session"
+                );
+
+                Ok(serde_json::json!({
+                    "scan_id": scan_id.0.to_string(),
+                    "target_address": format!("0x{:x}", address),
+                    "max_offset": max_offset,
+                    "max_level": max_level
+                }))
+            }
+            "pointer_scan_start" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+
+                // Get memory regions and modules for scanning
+                let regions = self.query_regions()?;
+                let modules = self.get_modules()?;
+
+                // Defensive: check we have regions to scan
+                if regions.is_empty() {
+                    tracing::warn!(target: "ghost_agent::backend::pointer", "No memory regions available for scanning");
+                    return Err(Error::Internal("No memory regions available".into()));
+                }
+
+                let module_tuples: Vec<(String, usize, usize)> = modules
+                    .iter()
+                    .map(|m| (m.name.clone(), m.base, m.size))
+                    .collect();
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    region_count = regions.len(),
+                    module_count = modules.len(),
+                    "Preparing pointer scan"
+                );
+
+                // Create a memory read closure with defensive bounds
+                let read_fn = |addr: usize, size: usize| -> Option<Vec<u8>> {
+                    // Defensive: reject unreasonable read sizes
+                    if size > 1024 * 1024 {
+                        return None;
+                    }
+                    self.read(addr, size).ok()
+                };
+
+                tracing::info!(target: "ghost_agent::backend::pointer", scan_id = scan_id.0, "Starting pointer scan");
+                let stats =
+                    self.pointer_scanner
+                        .scan(scan_id, &regions, &module_tuples, read_fn)?;
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    pointers_found = stats.pointers_found,
+                    elapsed_ms = stats.elapsed_ms,
+                    "Pointer scan completed"
+                );
+
+                Ok(serde_json::json!({
+                    "scan_id": scan_id.0.to_string(),
+                    "addresses_scanned": stats.addresses_scanned,
+                    "pointers_found": stats.pointers_found,
+                    "elapsed_ms": stats.elapsed_ms,
+                    "regions_scanned": stats.regions_scanned,
+                    "bytes_scanned": stats.bytes_scanned,
+                    "scan_rate": stats.scan_rate
+                }))
+            }
+            "pointer_scan_rescan" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+                let new_address = parse_address(&request.params["new_address"])?;
+
+                // Defensive: validate new address
+                if new_address < 0x10000 {
+                    tracing::warn!(target: "ghost_agent::backend::pointer", new_address = format!("0x{:x}", new_address), "New target address in null region");
+                    return Err(Error::Internal(format!(
+                        "New target address 0x{:x} is in null/reserved region",
+                        new_address
+                    )));
+                }
+
+                let options = PointerRescanOptions {
+                    scan_id,
+                    new_target_address: Some(new_address),
+                    filter_invalid: true,
+                    update_scores: true,
+                };
+
+                let modules = self.get_modules()?;
+                let module_tuples: Vec<(String, usize, usize)> = modules
+                    .iter()
+                    .map(|m| (m.name.clone(), m.base, m.size))
+                    .collect();
+
+                let read_fn = |addr: usize, size: usize| -> Option<Vec<u8>> {
+                    if size > 1024 * 1024 {
+                        return None;
+                    }
+                    self.read(addr, size).ok()
+                };
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    new_address = format!("0x{:x}", new_address),
+                    "Rescanning pointers"
+                );
+                let stats = self
+                    .pointer_scanner
+                    .rescan(options, &module_tuples, read_fn)?;
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    valid_count = stats.pointers_found,
+                    elapsed_ms = stats.elapsed_ms,
+                    "Pointer rescan completed"
+                );
+
+                Ok(serde_json::json!({
+                    "scan_id": scan_id.0.to_string(),
+                    "valid_count": stats.pointers_found,
+                    "elapsed_ms": stats.elapsed_ms
+                }))
+            }
+            "pointer_scan_results" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+
+                // Defensive: clamp limit to reasonable bounds (1 to 10000)
+                let limit = request.params["limit"]
+                    .as_u64()
+                    .unwrap_or(100)
+                    .clamp(1, 10000) as usize;
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    limit = limit,
+                    "Fetching pointer scan results"
+                );
+
+                let results = self.pointer_scanner.get_results(scan_id, 0, limit)?;
+
+                let paths: Vec<serde_json::Value> = results
+                    .iter()
+                    .map(|p| {
+                        serde_json::json!({
+                            "base_address": format!("0x{:x}", p.base_address),
+                            "base_module": p.base_module,
+                            "base_offset": p.base_offset.map(|o| format!("0x{:x}", o)),
+                            "offsets": p.offsets.iter().map(|o| format!("0x{:x}", o)).collect::<Vec<_>>(),
+                            "resolved_address": p.resolved_address.map(|a| format!("0x{:x}", a)),
+                            "stability_score": p.stability_score,
+                            "last_valid": p.last_valid
+                        })
+                    })
+                    .collect();
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    returned = paths.len(),
+                    "Returning pointer scan results"
+                );
+
+                Ok(serde_json::json!({
+                    "scan_id": scan_id.0.to_string(),
+                    "count": paths.len(),
+                    "paths": paths
+                }))
+            }
+            "pointer_scan_count" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+                let count = self.pointer_scanner.get_result_count(scan_id)?;
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    count = count,
+                    "Retrieved pointer scan count"
+                );
+
+                Ok(serde_json::json!({
+                    "scan_id": scan_id.0.to_string(),
+                    "count": count
+                }))
+            }
+            "pointer_scan_progress" => {
+                let progress = self.pointer_scanner.get_progress();
+
+                if let Some(p) = progress {
+                    tracing::trace!(
+                        target: "ghost_agent::backend::pointer",
+                        scan_id = p.scan_id.0,
+                        depth = p.current_depth,
+                        pointers = p.total_pointers,
+                        "Pointer scan progress"
+                    );
+                    Ok(serde_json::json!({
+                        "scan_id": p.scan_id.0.to_string(),
+                        "current_depth": p.current_depth,
+                        "max_depth": p.max_depth,
+                        "pointers_at_depth": p.pointers_at_depth,
+                        "total_pointers": p.total_pointers,
+                        "regions_scanned": p.regions_scanned,
+                        "regions_total": p.regions_total,
+                        "elapsed_ms": p.elapsed_ms,
+                        "complete": p.complete,
+                        "cancelled": p.cancelled,
+                        "phase": p.phase
+                    }))
+                } else {
+                    tracing::trace!(target: "ghost_agent::backend::pointer", "No active pointer scan");
+                    Ok(serde_json::json!({
+                        "active": false,
+                        "message": "No active pointer scan"
+                    }))
+                }
+            }
+            "pointer_scan_cancel" => {
+                self.pointer_scanner.cancel();
+                tracing::info!(target: "ghost_agent::backend::pointer", "Pointer scan cancelled");
+
+                Ok(serde_json::json!({
+                    "cancelled": true
+                }))
+            }
+            "pointer_scan_close" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+                self.pointer_scanner.close_session(scan_id)?;
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    "Closed pointer scan session"
+                );
+
+                Ok(serde_json::json!({
+                    "closed": true,
+                    "scan_id": scan_id.0.to_string()
+                }))
+            }
+            "pointer_scan_list" => {
+                let sessions = self.pointer_scanner.list_sessions()?;
+
+                let list: Vec<serde_json::Value> = sessions
+                    .iter()
+                    .map(|s| {
+                        serde_json::json!({
+                            "scan_id": s.id.0.to_string(),
+                            "target_address": format!("0x{:x}", s.target_address),
+                            "path_count": s.paths.len(),
+                            "rescan_count": s.rescan_count,
+                            "created_at": s.created_at,
+                            "last_rescan_at": s.last_rescan_at,
+                            "active": s.active
+                        })
+                    })
+                    .collect();
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    session_count = list.len(),
+                    "Listed pointer scan sessions"
+                );
+
+                Ok(serde_json::json!({
+                    "sessions": list,
+                    "count": list.len()
+                }))
+            }
+            "pointer_resolve" => {
+                let base_str = request.params["base"]
+                    .as_str()
+                    .ok_or_else(|| Error::Internal("Missing 'base' parameter".into()))?;
+
+                // Defensive: validate base string length
+                if base_str.len() > 256 {
+                    return Err(Error::Internal("Base parameter too long".into()));
+                }
+
+                let offsets_arr = request.params["offsets"]
+                    .as_array()
+                    .ok_or_else(|| Error::Internal("Missing 'offsets' parameter".into()))?;
+
+                // Defensive: limit offsets array size
+                if offsets_arr.len() > 20 {
+                    return Err(Error::Internal(
+                        "Too many offsets (max 20 levels supported)".into(),
+                    ));
+                }
+
+                let offsets: Vec<i64> = offsets_arr.iter().filter_map(|v| v.as_i64()).collect();
+
+                // Check if base is a module name or address
+                let modules = self.get_modules()?;
+                let module_tuples: Vec<(String, usize, usize)> = modules
+                    .iter()
+                    .map(|m| (m.name.clone(), m.base, m.size))
+                    .collect();
+
+                let path = if let Some(module) = modules.iter().find(|m| {
+                    m.name.to_lowercase() == base_str.to_lowercase()
+                        || m.name.to_lowercase().starts_with(&base_str.to_lowercase())
+                }) {
+                    // Module-relative path
+                    tracing::debug!(
+                        target: "ghost_agent::backend::pointer",
+                        module = module.name,
+                        offset_count = offsets.len(),
+                        "Resolving module-relative pointer"
+                    );
+                    PointerPath::module_relative(&module.name, 0, offsets)
+                } else {
+                    // Absolute address path
+                    let base_addr = parse_address(&request.params["base"])?;
+                    tracing::debug!(
+                        target: "ghost_agent::backend::pointer",
+                        base = format!("0x{:x}", base_addr),
+                        offset_count = offsets.len(),
+                        "Resolving absolute pointer"
+                    );
+                    PointerPath::new(base_addr, offsets)
+                };
+
+                let read_fn = |addr: usize, size: usize| -> Option<Vec<u8>> {
+                    if size > 1024 * 1024 {
+                        return None;
+                    }
+                    self.read(addr, size).ok()
+                };
+
+                let result = self
+                    .pointer_scanner
+                    .resolve_path(&path, &module_tuples, read_fn);
+
+                if result.success {
+                    tracing::debug!(
+                        target: "ghost_agent::backend::pointer",
+                        resolved = format!("0x{:x}", result.resolved_address.unwrap_or(0)),
+                        "Pointer resolved successfully"
+                    );
+                } else {
+                    tracing::debug!(
+                        target: "ghost_agent::backend::pointer",
+                        error = result.error.as_deref().unwrap_or("unknown"),
+                        "Pointer resolution failed"
+                    );
+                }
+
+                Ok(serde_json::json!({
+                    "success": result.success,
+                    "resolved_address": result.resolved_address.map(|a| format!("0x{:x}", a)),
+                    "chain_addresses": result.chain_addresses.iter().map(|a| format!("0x{:x}", a)).collect::<Vec<_>>(),
+                    "error": result.error
+                }))
+            }
+            "pointer_scan_compare" => {
+                let scan_id1 = self.parse_pointer_scan_id(&request.params["scan_id1"])?;
+                let scan_id2 = self.parse_pointer_scan_id(&request.params["scan_id2"])?;
+
+                tracing::debug!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id1 = scan_id1.0,
+                    scan_id2 = scan_id2.0,
+                    "Comparing pointer scans"
+                );
+
+                let result = self.pointer_scanner.compare_sessions(scan_id1, scan_id2)?;
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id1 = scan_id1.0,
+                    scan_id2 = scan_id2.0,
+                    common_valid = result.stats.common_valid_count,
+                    stability = format!("{:.1}%", result.stats.stability_percentage),
+                    "Pointer scan comparison completed"
+                );
+
+                Ok(serde_json::json!({
+                    "stats": {
+                        "first_count": result.stats.first_count,
+                        "second_count": result.stats.second_count,
+                        "common_valid_count": result.stats.common_valid_count,
+                        "common_invalid_count": result.stats.common_invalid_count,
+                        "stability_percentage": result.stats.stability_percentage
+                    },
+                    "common_valid_count": result.common_valid.len(),
+                    "common_invalid_count": result.common_invalid.len(),
+                    "only_in_first_count": result.only_in_first.len(),
+                    "only_in_second_count": result.only_in_second.len()
+                }))
+            }
+            "pointer_scan_export" => {
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+                let path = request.params["path"]
+                    .as_str()
+                    .ok_or_else(|| Error::Internal("Missing 'path' parameter".into()))?;
+
+                // Defensive: validate path length and characters
+                if path.len() > 4096 {
+                    return Err(Error::Internal("Export path too long".into()));
+                }
+                if path.contains('\0') {
+                    return Err(Error::Internal("Invalid characters in path".into()));
+                }
+
+                // Determine format from file extension
+                let format = if path.ends_with(".csv") {
+                    PointerExportFormat::Csv
+                } else if path.ends_with(".ptr") {
+                    PointerExportFormat::CheatEnginePtr
+                } else {
+                    PointerExportFormat::Json
+                };
+
+                let content = self.pointer_scanner.export_results(scan_id, format)?;
+
+                // Defensive: check content size before writing
+                const MAX_EXPORT_SIZE: usize = 100 * 1024 * 1024; // 100MB
+                if content.len() > MAX_EXPORT_SIZE {
+                    return Err(Error::Internal(format!(
+                        "Export size {} exceeds maximum {}",
+                        content.len(),
+                        MAX_EXPORT_SIZE
+                    )));
+                }
+
+                std::fs::write(path, &content)
+                    .map_err(|e| Error::Internal(format!("Failed to write file: {}", e)))?;
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    path = path,
+                    bytes = content.len(),
+                    format = ?format,
+                    "Exported pointer scan results"
+                );
+
+                Ok(serde_json::json!({
+                    "success": true,
+                    "path": path,
+                    "format": format!("{:?}", format),
+                    "bytes_written": content.len()
+                }))
+            }
+            "pointer_scan_import" => {
+                let path = request.params["path"]
+                    .as_str()
+                    .ok_or_else(|| Error::Internal("Missing 'path' parameter".into()))?;
+
+                // Defensive: validate path
+                if path.len() > 4096 {
+                    return Err(Error::Internal("Import path too long".into()));
+                }
+                if path.contains('\0') {
+                    return Err(Error::Internal("Invalid characters in path".into()));
+                }
+
+                // Defensive: check file size before reading
+                let metadata = std::fs::metadata(path)
+                    .map_err(|e| Error::Internal(format!("Failed to access file: {}", e)))?;
+
+                const MAX_IMPORT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
+                if metadata.len() > MAX_IMPORT_SIZE {
+                    return Err(Error::Internal(format!(
+                        "Import file size {} exceeds maximum {}",
+                        metadata.len(),
+                        MAX_IMPORT_SIZE
+                    )));
+                }
+
+                let content = std::fs::read_to_string(path)
+                    .map_err(|e| Error::Internal(format!("Failed to read file: {}", e)))?;
+
+                // Create a new session for the imported data
+                let options = PointerScanOptions::default();
+                let scan_id = self.pointer_scanner.create_session(options)?;
+
+                let count = self.pointer_scanner.import_results(scan_id, &content)?;
+
+                tracing::info!(
+                    target: "ghost_agent::backend::pointer",
+                    scan_id = scan_id.0,
+                    path = path,
+                    count = count,
+                    "Imported pointer scan results"
+                );
+
+                Ok(serde_json::json!({
+                    "success": true,
+                    "scan_id": scan_id.0.to_string(),
+                    "imported_count": count,
+                    "path": path
+                }))
+            }
+            _ => {
+                tracing::warn!(
+                    target: "ghost_agent::backend::pointer",
+                    method = method,
+                    "Unknown pointer method"
+                );
+                Err(Error::NotImplemented(format!(
+                    "Pointer method not implemented: {}",
+                    method
+                )))
+            }
+        }
+    }
+
+    /// Parse pointer scan ID from JSON value with defensive validation.
+    ///
+    /// Accepts both numeric and string formats for flexibility.
+    fn parse_pointer_scan_id(&self, value: &serde_json::Value) -> Result<PointerScanId> {
+        if let Some(n) = value.as_u64() {
+            // Defensive: check for overflow
+            if n > u32::MAX as u64 {
+                return Err(Error::Internal(format!(
+                    "Scan ID {} exceeds maximum value",
+                    n
+                )));
+            }
+            return Ok(PointerScanId(n as u32));
+        }
+        if let Some(s) = value.as_str() {
+            // Defensive: limit string length
+            if s.len() > 20 {
+                return Err(Error::Internal("Scan ID string too long".into()));
+            }
+            return s
+                .trim()
+                .parse::<u32>()
+                .map(PointerScanId)
+                .map_err(|_| Error::Internal(format!("Invalid scan_id format: {}", value)));
+        }
+        Err(Error::Internal("Missing or invalid scan_id".into()))
     }
 
     pub fn create_hook_ex(&self, params: CreateHookParams) -> Result<u32> {
@@ -5858,5 +6463,461 @@ mod tests {
         let result = backend.adjust_privilege("InvalidPrivilegeName", true);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // Should be false for invalid privilege
+    }
+
+    // =========================================================================
+    // Pointer Scanner Tests
+    // =========================================================================
+
+    use ghost_common::ipc::ResponseResult;
+
+    /// Helper to check if a Response is successful
+    fn is_success(result: &ResponseResult) -> bool {
+        matches!(result, ResponseResult::Success(_))
+    }
+
+    /// Helper to check if a Response is an error
+    fn is_error(result: &ResponseResult) -> bool {
+        matches!(result, ResponseResult::Error { .. })
+    }
+
+    /// Helper to extract success value from ResponseResult
+    fn get_success_value(result: &ResponseResult) -> Option<&serde_json::Value> {
+        match result {
+            ResponseResult::Success(v) => Some(v),
+            ResponseResult::Error { .. } => None,
+        }
+    }
+
+    #[test]
+    fn test_pointer_scan_create_valid() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000",
+                "max_offset": 4096,
+                "max_level": 5
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result), "Expected success, got error");
+        let data = get_success_value(&result.result).unwrap();
+        assert!(data.get("scan_id").is_some());
+        assert_eq!(data["max_offset"], 4096);
+        assert_eq!(data["max_level"], 5);
+    }
+
+    #[test]
+    fn test_pointer_scan_create_clamps_max_offset() {
+        let backend = InProcessBackend::new().unwrap();
+        // Test that max_offset is clamped to reasonable bounds
+        let req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000",
+                "max_offset": 999999999  // Way too large
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        let data = get_success_value(&result.result).unwrap();
+        // Should be clamped to 1MB max
+        assert!(data["max_offset"].as_i64().unwrap() <= 1024 * 1024);
+    }
+
+    #[test]
+    fn test_pointer_scan_create_clamps_max_level() {
+        let backend = InProcessBackend::new().unwrap();
+        // Test that max_level is clamped
+        let req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000",
+                "max_level": 100  // Too deep
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        let data = get_success_value(&result.result).unwrap();
+        // Should be clamped to 10 max
+        assert!(data["max_level"].as_u64().unwrap() <= 10);
+    }
+
+    #[test]
+    fn test_pointer_scan_create_rejects_null_address() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x1000"  // In null region (< 0x10000)
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for null region address"
+        );
+    }
+
+    #[test]
+    fn test_pointer_scan_list_empty() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_list".to_string(),
+            id: 1,
+            params: json!({}),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        let data = get_success_value(&result.result).unwrap();
+        assert!(data.get("sessions").is_some());
+        assert!(data.get("count").is_some());
+    }
+
+    #[test]
+    fn test_pointer_scan_progress_no_active() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_progress".to_string(),
+            id: 1,
+            params: json!({}),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        let data = get_success_value(&result.result).unwrap();
+        // Should indicate no active scan
+        assert_eq!(data["active"], false);
+    }
+
+    #[test]
+    fn test_pointer_scan_cancel() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_cancel".to_string(),
+            id: 1,
+            params: json!({}),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        let data = get_success_value(&result.result).unwrap();
+        assert_eq!(data["cancelled"], true);
+    }
+
+    #[test]
+    fn test_pointer_scan_close_invalid_id() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_close".to_string(),
+            id: 1,
+            params: json!({
+                "scan_id": "99999"  // Non-existent
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for invalid scan_id"
+        );
+    }
+
+    #[test]
+    fn test_pointer_scan_count_invalid_id() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_count".to_string(),
+            id: 1,
+            params: json!({
+                "scan_id": "99999"
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for invalid scan_id"
+        );
+    }
+
+    #[test]
+    fn test_pointer_scan_results_clamps_limit() {
+        let backend = InProcessBackend::new().unwrap();
+        // First create a session
+        let create_req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000"
+            }),
+        };
+        let create_result = backend.handle_request(&create_req);
+        assert!(is_success(&create_result.result));
+        let scan_id = get_success_value(&create_result.result).unwrap()["scan_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // Request with excessive limit
+        let req = Request {
+            method: "pointer_scan_results".to_string(),
+            id: 2,
+            params: json!({
+                "scan_id": scan_id,
+                "limit": 999999  // Should be clamped
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_success(&result.result));
+        // Result should succeed with clamped limit
+        let data = get_success_value(&result.result).unwrap();
+        assert!(data.get("paths").is_some());
+    }
+
+    #[test]
+    fn test_pointer_resolve_missing_base() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_resolve".to_string(),
+            id: 1,
+            params: json!({
+                "offsets": [0x10, 0x20]
+                // Missing "base"
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_error(&result.result), "Expected error for missing base");
+    }
+
+    #[test]
+    fn test_pointer_resolve_missing_offsets() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_resolve".to_string(),
+            id: 1,
+            params: json!({
+                "base": "0x100000"
+                // Missing "offsets"
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for missing offsets"
+        );
+    }
+
+    #[test]
+    fn test_pointer_resolve_too_many_offsets() {
+        let backend = InProcessBackend::new().unwrap();
+        // Create an array with more than 20 offsets
+        let offsets: Vec<i64> = (0..25).map(|i| i * 0x10).collect();
+        let req = Request {
+            method: "pointer_resolve".to_string(),
+            id: 1,
+            params: json!({
+                "base": "0x100000",
+                "offsets": offsets  // More than 20 levels
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for too many offsets"
+        );
+    }
+
+    #[test]
+    fn test_pointer_resolve_with_module_name() {
+        let backend = InProcessBackend::new().unwrap();
+        let modules = backend.get_modules().unwrap();
+        if let Some(module) = modules.first() {
+            let req = Request {
+                method: "pointer_resolve".to_string(),
+                id: 1,
+                params: json!({
+                    "base": module.name,
+                    "offsets": [0x100]
+                }),
+            };
+            let result = backend.handle_request(&req);
+            // May fail to resolve but should not error on input validation
+            assert!(is_success(&result.result));
+        }
+    }
+
+    #[test]
+    fn test_pointer_scan_compare_invalid_ids() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_compare".to_string(),
+            id: 1,
+            params: json!({
+                "scan_id1": "99998",
+                "scan_id2": "99999"
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for invalid scan_ids"
+        );
+    }
+
+    #[test]
+    fn test_pointer_scan_export_invalid_path() {
+        let backend = InProcessBackend::new().unwrap();
+        // First create a session
+        let create_req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000"
+            }),
+        };
+        let create_result = backend.handle_request(&create_req);
+        let scan_id = get_success_value(&create_result.result).unwrap()["scan_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // Try to export with null character in path
+        let req = Request {
+            method: "pointer_scan_export".to_string(),
+            id: 2,
+            params: json!({
+                "scan_id": scan_id,
+                "path": "test\0file.json"  // Invalid path
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(is_error(&result.result), "Expected error for invalid path");
+    }
+
+    #[test]
+    fn test_pointer_scan_import_nonexistent_file() {
+        let backend = InProcessBackend::new().unwrap();
+        let req = Request {
+            method: "pointer_scan_import".to_string(),
+            id: 1,
+            params: json!({
+                "path": "/nonexistent/path/to/file.json"
+            }),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for nonexistent file"
+        );
+    }
+
+    #[test]
+    fn test_pointer_scan_lifecycle() {
+        let backend = InProcessBackend::new().unwrap();
+
+        // 1. Create session
+        let create_req = Request {
+            method: "pointer_scan_create".to_string(),
+            id: 1,
+            params: json!({
+                "address": "0x100000",
+                "max_offset": 256,
+                "max_level": 2
+            }),
+        };
+        let create_result = backend.handle_request(&create_req);
+        assert!(is_success(&create_result.result));
+        let scan_id = get_success_value(&create_result.result).unwrap()["scan_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // 2. List sessions - should have one
+        let list_req = Request {
+            method: "pointer_scan_list".to_string(),
+            id: 2,
+            params: json!({}),
+        };
+        let list_result = backend.handle_request(&list_req);
+        assert!(is_success(&list_result.result));
+        let sessions = get_success_value(&list_result.result).unwrap()["sessions"]
+            .as_array()
+            .unwrap();
+        assert!(!sessions.is_empty());
+
+        // 3. Get count (should be 0 before scan starts)
+        let count_req = Request {
+            method: "pointer_scan_count".to_string(),
+            id: 3,
+            params: json!({
+                "scan_id": scan_id.clone()
+            }),
+        };
+        let count_result = backend.handle_request(&count_req);
+        assert!(is_success(&count_result.result));
+        assert_eq!(get_success_value(&count_result.result).unwrap()["count"], 0);
+
+        // 4. Close session
+        let close_req = Request {
+            method: "pointer_scan_close".to_string(),
+            id: 4,
+            params: json!({
+                "scan_id": scan_id
+            }),
+        };
+        let close_result = backend.handle_request(&close_req);
+        assert!(is_success(&close_result.result));
+        assert_eq!(
+            get_success_value(&close_result.result).unwrap()["closed"],
+            true
+        );
+    }
+
+    #[test]
+    fn test_parse_pointer_scan_id_numeric() {
+        let backend = InProcessBackend::new().unwrap();
+        let result = backend.parse_pointer_scan_id(&json!(42));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().0, 42);
+    }
+
+    #[test]
+    fn test_parse_pointer_scan_id_string() {
+        let backend = InProcessBackend::new().unwrap();
+        let result = backend.parse_pointer_scan_id(&json!("123"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().0, 123);
+    }
+
+    #[test]
+    fn test_parse_pointer_scan_id_invalid() {
+        let backend = InProcessBackend::new().unwrap();
+        let result = backend.parse_pointer_scan_id(&json!("not_a_number"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_pointer_scan_id_too_long() {
+        let backend = InProcessBackend::new().unwrap();
+        let result = backend.parse_pointer_scan_id(&json!("123456789012345678901234567890"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pointer_method_name_too_long() {
+        let backend = InProcessBackend::new().unwrap();
+        let long_method = "pointer_".to_string() + &"x".repeat(100);
+        let req = Request {
+            method: long_method,
+            id: 1,
+            params: json!({}),
+        };
+        let result = backend.handle_request(&req);
+        assert!(
+            is_error(&result.result),
+            "Expected error for too long method name"
+        );
     }
 }

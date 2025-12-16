@@ -17,6 +17,7 @@ pub mod ipc_fuzzing;
 pub mod mcp_protocol;
 pub mod multi_server_integration;
 pub mod patch_aware_dump;
+pub mod pointer_scanner;
 pub mod static_tools;
 
 // These modules require additional dependencies and are conditionally compiled
