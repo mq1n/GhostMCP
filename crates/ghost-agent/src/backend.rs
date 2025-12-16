@@ -79,19 +79,28 @@ fn parse_scan_id(value: &serde_json::Value) -> Result<ScanId> {
     Err(Error::Internal("Missing or invalid scan_id".into()))
 }
 
-/// Parse address from JSON value (supports both numeric and hex string formats)
+/// Parse address from JSON value (supports numeric, hex string, and decimal string formats)
 fn parse_address(value: &serde_json::Value) -> Result<usize> {
     // Try as number first
     if let Some(n) = value.as_u64() {
         return Ok(n as usize);
     }
-    // Try as string (hex format like "0x140001000" or "140001000")
+    // Try as string
     if let Some(s) = value.as_str() {
         let s = s.trim();
-        let s = s
-            .strip_prefix("0x")
-            .or_else(|| s.strip_prefix("0X"))
-            .unwrap_or(s);
+        
+        // If it has 0x/0X prefix, parse as hex
+        if let Some(hex_str) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+            return usize::from_str_radix(hex_str, 16)
+                .map_err(|_| Error::Internal(format!("Invalid hex address: {}", value)));
+        }
+        
+        // Otherwise, try decimal first (for addresses from scan results like "1254177897440")
+        if let Ok(n) = s.parse::<usize>() {
+            return Ok(n);
+        }
+        
+        // Fallback: try as hex without prefix (legacy compatibility)
         return usize::from_str_radix(s, 16)
             .map_err(|_| Error::Internal(format!("Invalid address format: {}", value)));
     }
