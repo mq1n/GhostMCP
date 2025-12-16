@@ -427,7 +427,13 @@ impl AgentClient {
         let expected_id = request.id;
         let timeout_ms = self.config.timeout_ms;
 
+        // Maximum number of event notifications to skip before giving up
+        // This prevents infinite loops if the agent keeps sending events
+        const MAX_SKIPPED_EVENTS: u32 = 1000;
+
         let read_future = async {
+            let mut skipped_events: u32 = 0;
+
             loop {
                 let mut len_buf = [0u8; 4];
                 stream.read_exact(&mut len_buf).await?;
@@ -450,6 +456,14 @@ impl AgentClient {
 
                 // Skip event notifications (id=0) - these are async events from the agent
                 if response.id == 0 {
+                    skipped_events += 1;
+                    if skipped_events >= MAX_SKIPPED_EVENTS {
+                        warn!(target: "ghost_mcp::ipc", skipped = skipped_events, "Too many event notifications while waiting for response");
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            format!("Skipped {} event notifications without receiving response", skipped_events),
+                        ));
+                    }
                     debug!(target: "ghost_mcp::ipc", "Skipping event notification while waiting for response");
                     continue;
                 }
