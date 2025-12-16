@@ -64,6 +64,21 @@ pub struct CreateHookParams {
     pub size: Option<usize>,
 }
 
+/// Parse scan_id from JSON value (supports both numeric and string formats)
+fn parse_scan_id(value: &serde_json::Value) -> Result<ScanId> {
+    if let Some(n) = value.as_u64() {
+        return Ok(ScanId(n as u32));
+    }
+    if let Some(s) = value.as_str() {
+        return s
+            .trim()
+            .parse::<u32>()
+            .map(ScanId)
+            .map_err(|_| Error::Internal(format!("Invalid scan_id format: {}", value)));
+    }
+    Err(Error::Internal("Missing or invalid scan_id".into()))
+}
+
 /// Parse address from JSON value (supports both numeric and hex string formats)
 fn parse_address(value: &serde_json::Value) -> Result<usize> {
     // Try as number first
@@ -1226,12 +1241,7 @@ impl InProcessBackend {
                 Ok(serde_json::json!({"scan_id": id.0}))
             }
             "scan_first" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
 
                 if let Some(compare_str) = request.params.get("compare").and_then(|v| v.as_str()) {
                     let compare_type = ScanCompareType::parse(compare_str).ok_or_else(|| {
@@ -1256,12 +1266,7 @@ impl InProcessBackend {
                 Ok(serde_json::to_value(stats)?)
             }
             "scan_next" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let compare_str = request.params["compare"].as_str().unwrap_or("exact");
                 let compare_type = ScanCompareType::parse(compare_str).ok_or_else(|| {
                     Error::Internal(format!("Invalid compare type: {}", compare_str))
@@ -1287,12 +1292,7 @@ impl InProcessBackend {
                 Ok(serde_json::to_value(stats)?)
             }
             "scan_results" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let offset = request.params["offset"].as_u64().unwrap_or(0) as usize;
                 let limit = request.params["limit"].as_u64().unwrap_or(100) as usize;
 
@@ -1312,12 +1312,7 @@ impl InProcessBackend {
                 }))
             }
             "scan_count" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let count = self.scanner.get_result_count(scan_id);
                 Ok(serde_json::json!({"count": count}))
             }
@@ -1331,12 +1326,7 @@ impl InProcessBackend {
                 Ok(serde_json::json!({"cancelled": true}))
             }
             "scan_close" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let closed = self.scanner.close_session(scan_id);
                 tracing::info!(target: "ghost_agent::backend", scan_id = scan_id.0, closed = closed, "Scan session closed");
                 Ok(serde_json::json!({"closed": closed}))
@@ -1346,12 +1336,7 @@ impl InProcessBackend {
                 Ok(serde_json::to_value(sessions)?)
             }
             "scan_export" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let format_str = request.params["format"].as_str().unwrap_or("json");
                 let format = ScanExportFormat::parse(format_str)
                     .ok_or_else(|| Error::Internal(format!("Invalid format: {}", format_str)))?;
@@ -1365,12 +1350,7 @@ impl InProcessBackend {
                 Ok(serde_json::json!({"data": data, "format": format_str}))
             }
             "scan_import" => {
-                let scan_id = ScanId(
-                    request.params["scan_id"]
-                        .as_u64()
-                        .ok_or(Error::Internal("Missing scan_id".into()))?
-                        as u32,
-                );
+                let scan_id = parse_scan_id(&request.params["scan_id"])?;
                 let json = request.params["data"]
                     .as_str()
                     .ok_or(Error::Internal("Missing data".into()))?;
