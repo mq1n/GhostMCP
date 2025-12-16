@@ -46,6 +46,12 @@ use windows::Win32::System::Threading::{
     PROCESS_VM_READ,
 };
 
+// SAFETY: InProcessBackend uses synchronization primitives (Mutex, RwLock) for all mutable state.
+// The process HANDLE is safe to share across threads as it's a kernel object reference.
+// All Windows API calls used are thread-safe when accessing the current process.
+unsafe impl Send for InProcessBackend {}
+unsafe impl Sync for InProcessBackend {}
+
 /// Parameters for creating an extended hook
 #[derive(Debug, Clone, Default)]
 pub struct CreateHookParams {
@@ -1074,11 +1080,11 @@ impl InProcessBackend {
                 let start = request
                     .params
                     .get("start_address")
-                    .and_then(|v| Self::safe_parse_hex_address(v));
+                    .and_then(Self::safe_parse_hex_address);
                 let end = request
                     .params
                     .get("end_address")
-                    .and_then(|v| Self::safe_parse_hex_address(v));
+                    .and_then(Self::safe_parse_hex_address);
                 let results = self.search_value(&value_bytes, value_type, start, end)?;
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "Memory search complete");
                 Ok(serde_json::to_value(results)?)
@@ -2088,7 +2094,7 @@ impl MemoryAccess for InProcessBackend {
             }
 
             // Use ReadProcessMemory to avoid triggering ASan instrumentation
-            let process = self.process_handle.unwrap_or_else(GetCurrentProcess);
+            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
             let mut buffer = vec![0u8; safe_size];
             let mut bytes_read: usize = 0;
 
@@ -3251,7 +3257,7 @@ impl StaticAnalysis for InProcessBackend {
             for idx in 0..data.len() {
                 let byte = data[idx];
                 // Check if printable ASCII (space to ~)
-                if !(byte >= 0x20 && byte <= 0x7E) {
+                if !(0x20..=0x7E).contains(&byte) {
                     let string_length = idx - string_start;
                     if string_length >= min_len && strings.len() < max_strings {
                         if let Ok(s) = std::str::from_utf8(&data[string_start..idx]) {
@@ -3277,7 +3283,7 @@ impl StaticAnalysis for InProcessBackend {
                 }
                 let wchar = u16::from_le_bytes([data[idx * 2], data[idx * 2 + 1]]);
                 // Check if printable (space to ~)
-                if !(wchar >= 0x0020 && wchar < 0x007F) {
+                if !(0x0020..0x007F).contains(&wchar) {
                     let string_length = idx - string_start;
                     if string_length >= min_len && strings.len() < max_strings {
                         // Convert UTF-16 to String

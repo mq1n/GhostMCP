@@ -461,7 +461,10 @@ impl AgentClient {
                         warn!(target: "ghost_mcp::ipc", skipped = skipped_events, "Too many event notifications while waiting for response");
                         return Err(std::io::Error::new(
                             std::io::ErrorKind::TimedOut,
-                            format!("Skipped {} event notifications without receiving response", skipped_events),
+                            format!(
+                                "Skipped {} event notifications without receiving response",
+                                skipped_events
+                            ),
                         ));
                     }
                     debug!(target: "ghost_mcp::ipc", "Skipping event notification while waiting for response");
