@@ -725,7 +725,7 @@ impl ExecutionEngine {
             let original_rsp = context.Rsp;
 
             // Validate stack pointer is reasonable (non-null, aligned)
-            if original_rsp == 0 || !original_rsp.is_multiple_of(8) {
+            if original_rsp == 0 || original_rsp % 8 != 0 {
                 warn!(target: "ghost_core::execution",
                     target_tid = target_tid,
                     rsp = format!("{:#x}", original_rsp),
@@ -2323,7 +2323,7 @@ pub fn parse_hex_bytes(hex: &str) -> Result<Vec<u8>> {
 
     let hex = hex.replace(' ', "").replace("0x", "").replace(',', "");
 
-    if !hex.len().is_multiple_of(2) {
+    if hex.len() % 2 != 0 {
         return Err(Error::Internal(format!(
             "Hex string must have even length, got {} characters",
             hex.len()

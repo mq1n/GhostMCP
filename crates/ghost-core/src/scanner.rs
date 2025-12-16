@@ -394,7 +394,7 @@ impl Scanner {
             regions_scanned += 1;
 
             // Update progress periodically
-            if regions_scanned.is_multiple_of(10) || regions_scanned == regions_total {
+            if regions_scanned % 10 == 0 || regions_scanned == regions_total {
                 self.update_progress(session_id, ScanProgress {
                     scan_id: session_id,
                     phase: "Scanning memory".into(),

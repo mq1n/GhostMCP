@@ -46,7 +46,7 @@ impl EventRingBuffer {
                 }
                 BackpressureStrategy::Sample { rate } => {
                     self.sample_counter += 1;
-                    if !self.sample_counter.is_multiple_of(rate as u64) {
+                    if self.sample_counter % (rate as u64) != 0 {
                         self.stats.total_dropped += 1;
                         return false;
                     }
