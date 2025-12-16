@@ -213,13 +213,25 @@ impl ApiPackManager {
             }
         }
 
-        let candidates = [
+        let mut candidates: Vec<std::path::PathBuf> = vec![
+            std::path::PathBuf::from(format!("data/api_packs/{}.json", name)),
             std::path::PathBuf::from(format!("../../data/api_packs/{}.json", name)),
             std::path::PathBuf::from(format!(
                 "crates/ghost-static-mcp/data/api_packs/{}.json",
                 name
             )),
         ];
+
+        // Add compile-time workspace root path (ghost-core is at crates/ghost-core)
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        if let Some(workspace_root) = manifest_dir.parent().and_then(|p| p.parent()) {
+            candidates.push(
+                workspace_root
+                    .join("data")
+                    .join("api_packs")
+                    .join(format!("{}.json", name)),
+            );
+        }
 
         for candidate in &candidates {
             if candidate.exists() {
