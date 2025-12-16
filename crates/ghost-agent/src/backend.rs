@@ -32,7 +32,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast::error::TryRecvError;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::HMODULE;
-use windows::Win32::System::Diagnostics::Debug::IsDebuggerPresent;
+use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
     VirtualAlloc, VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT,
@@ -2005,7 +2005,9 @@ impl InProcessBackend {
 
 impl MemoryAccess for InProcessBackend {
     fn read(&self, addr: usize, size: usize) -> Result<Vec<u8>> {
-        // Direct memory read - we're in-process!
+        // Use ReadProcessMemory instead of direct pointer access to avoid
+        // triggering ASan in instrumented processes. ReadProcessMemory goes
+        // through the kernel and bypasses ASan's shadow memory checks.
         unsafe {
             let ptr = addr as *const u8;
 
@@ -2049,20 +2051,29 @@ impl MemoryAccess for InProcessBackend {
                 });
             }
 
-            // Use SEH to catch access violations
-            let mut result = Vec::with_capacity(safe_size);
-            let success = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let slice = std::slice::from_raw_parts(ptr, safe_size);
-                result.extend_from_slice(slice);
-            }));
+            // Use ReadProcessMemory to avoid triggering ASan instrumentation
+            let process = GetCurrentProcess();
+            let mut buffer = vec![0u8; safe_size];
+            let mut bytes_read: usize = 0;
 
-            match success {
-                Ok(()) => Ok(result),
-                Err(_) => Err(Error::MemoryAccess {
+            let result = ReadProcessMemory(
+                process,
+                ptr as *const _,
+                buffer.as_mut_ptr() as *mut _,
+                safe_size,
+                Some(&mut bytes_read),
+            );
+
+            if result.is_err() || bytes_read == 0 {
+                return Err(Error::MemoryAccess {
                     address: addr,
-                    message: "Access violation during read".into(),
-                }),
+                    message: "ReadProcessMemory failed".into(),
+                });
             }
+
+            // Truncate buffer to actual bytes read
+            buffer.truncate(bytes_read);
+            Ok(buffer)
         }
     }
 
