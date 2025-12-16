@@ -17,8 +17,9 @@ use ghost_common::{
     Error, MemoryRegion, MemoryState, RegionFilter, Result, ScanCompareType, ScanExportFormat,
     ScanId, ScanOptions, ScanProgress, ScanResultEx, ScanSession, ScanStats, ValueType,
 };
+use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tracing::{debug, info, trace, warn};
@@ -210,7 +211,7 @@ impl Scanner {
         }
     }
 
-    /// Perform initial scan on memory regions
+    /// Perform initial scan on memory regions using parallel scanning
     ///
     /// # Arguments
     /// * `session_id` - The scan session ID from `create_session`
@@ -228,7 +229,7 @@ impl Scanner {
         read_memory: F,
     ) -> Result<ScanStats>
     where
-        F: Fn(usize, usize) -> Result<Vec<u8>>,
+        F: Fn(usize, usize) -> Result<Vec<u8>> + Sync,
     {
         self.reset_cancel(session_id);
         let start_time = Instant::now();
@@ -288,11 +289,6 @@ impl Scanner {
             total_bytes = total_bytes,
             "Regions filtered");
 
-        let mut results: Vec<ScanResultEx> = Vec::new();
-        let mut bytes_scanned: u64 = 0;
-        let mut addresses_checked: u64 = 0;
-        let mut regions_scanned: u32 = 0;
-
         let alignment = options
             .alignment
             .unwrap_or_else(|| alignment_for_type(options.value_type));
@@ -303,7 +299,7 @@ impl Scanner {
             session_id,
             ScanProgress {
                 scan_id: session_id,
-                phase: "Scanning memory".into(),
+                phase: "Scanning memory (parallel)".into(),
                 regions_scanned: 0,
                 regions_total,
                 bytes_scanned: 0,
@@ -316,182 +312,146 @@ impl Scanner {
         );
 
         const MAX_CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
-        const TIMEOUT_SECS: u64 = 60;
 
-        // Optimize cancellation check by avoiding RwLock in tight loop
+        // Shared atomic counters for parallel scanning
+        let bytes_scanned = Arc::new(AtomicU64::new(0));
+        let addresses_checked = Arc::new(AtomicU64::new(0));
+        let regions_scanned = Arc::new(AtomicU32::new(0));
+
+        // Get cancel flag for checking cancellation
         let cancel_flag = self.cancel_flag(session_id);
-        let check_cancelled = || {
-            if let Some(flag) = &cancel_flag {
-                flag.load(Ordering::Relaxed)
-            } else {
-                false
-            }
-        };
+        let is_cancelled = Arc::new(AtomicBool::new(false));
 
         debug!(target: "ghost_core::scanner", 
             count = filtered_regions.len(),
             value_size = value_size,
             alignment = alignment,
-            "Starting region scan loop");
+            "Starting parallel region scan");
 
-        for (region_idx, region) in filtered_regions.iter().enumerate() {
-            if region_idx == 0 {
-                debug!(target: "ghost_core::scanner",
-                    base = format!("0x{:x}", region.base),
-                    size = region.size,
-                    "Processing first region");
-            }
-
-            // Check timeout and cancellation less frequently (per region)
-            if start_time.elapsed().as_secs() > TIMEOUT_SECS {
-                warn!(target: "ghost_core::scanner", scan_id = session_id.0, "Scan timed out");
-                return Err(Error::Internal("Scan timed out".into()));
-            }
-
-            if check_cancelled() {
-                break;
-            }
-
-            // Process region in chunks
-            let mut offset = 0;
-            while offset < region.size {
-                if check_cancelled() {
-                    break;
+        // Parallel scan all regions
+        let results: Vec<ScanResultEx> = filtered_regions
+            .par_iter()
+            .flat_map(|region| {
+                // Check cancellation at region level
+                if is_cancelled.load(Ordering::Relaxed) {
+                    return Vec::new();
+                }
+                if let Some(ref flag) = cancel_flag {
+                    if flag.load(Ordering::Relaxed) {
+                        is_cancelled.store(true, Ordering::Relaxed);
+                        return Vec::new();
+                    }
                 }
 
-                let chunk_size = (region.size - offset).min(MAX_CHUNK_SIZE);
-                let chunk_base = region.base + offset;
+                let mut region_results: Vec<ScanResultEx> = Vec::new();
+                let mut offset = 0;
 
-                match read_memory(chunk_base, chunk_size) {
-                    Ok(data) => {
-                        if data.is_empty() {
-                            // Should not happen with valid read_memory, but prevent infinite loop
-                            offset += chunk_size;
-                            continue;
+                while offset < region.size {
+                    // Check cancellation
+                    if let Some(ref flag) = cancel_flag {
+                        if flag.load(Ordering::Relaxed) {
+                            is_cancelled.store(true, Ordering::Relaxed);
+                            break;
                         }
+                    }
 
-                        bytes_scanned = bytes_scanned.saturating_add(data.len() as u64);
+                    let chunk_size = (region.size - offset).min(MAX_CHUNK_SIZE);
+                    let chunk_base = region.base + offset;
 
-                        // Scan this chunk
-                        // Ensure step is at least 1 to prevent infinite loop
-                        let step = if options.fast_scan && alignment > 0 {
-                            alignment
-                        } else {
-                            1
-                        };
-                        let mut i = 0;
-
-                        // Optimize inner loop: verify cancellation every 1000 iterations to reduce atomic overhead
-                        let mut loop_count = 0;
-
-                        while i + value_size <= data.len() {
-                            loop_count += 1;
-                            if loop_count >= 1000 {
-                                loop_count = 0;
-                                if check_cancelled() {
-                                    break;
-                                }
+                    match read_memory(chunk_base, chunk_size) {
+                        Ok(data) => {
+                            if data.is_empty() {
+                                offset += chunk_size;
+                                continue;
                             }
 
-                            addresses_checked += 1;
-                            let current = &data[i..i + value_size];
+                            bytes_scanned.fetch_add(data.len() as u64, Ordering::Relaxed);
 
-                            let matches = match options.compare_type {
-                                ScanCompareType::Exact => current == value_bytes.as_slice(),
-                                ScanCompareType::UnknownInitial => true, // All values match
-                                ScanCompareType::Between => compare_between(
-                                    current,
-                                    &min_bytes,
-                                    &max_bytes,
-                                    options.value_type,
-                                ),
-                                ScanCompareType::GreaterThan => {
-                                    compare_gt(current, &value_bytes, options.value_type)
-                                }
-                                ScanCompareType::LessThan => {
-                                    compare_lt(current, &value_bytes, options.value_type)
-                                }
-                                ScanCompareType::Fuzzy => compare_fuzzy(
-                                    current,
-                                    &value_bytes,
-                                    options.value_type,
-                                    options.fuzzy_tolerance,
-                                ),
-                                _ => false, // Other types require previous scan
+                            // Scan this chunk
+                            let step = if options.fast_scan && alignment > 0 {
+                                alignment
+                            } else {
+                                1
                             };
+                            let mut i = 0;
 
-                            if matches {
-                                results.push(ScanResultEx {
-                                    address: chunk_base + i,
-                                    value: current.to_vec(),
-                                    previous_value: None,
-                                    first_value: Some(current.to_vec()),
-                                });
+                            while i + value_size <= data.len() {
+                                addresses_checked.fetch_add(1, Ordering::Relaxed);
+                                let current = &data[i..i + value_size];
 
-                                if options.max_results > 0 && results.len() >= options.max_results {
-                                    break;
+                                let matches = match options.compare_type {
+                                    ScanCompareType::Exact => current == value_bytes.as_slice(),
+                                    ScanCompareType::UnknownInitial => true,
+                                    ScanCompareType::Between => compare_between(
+                                        current,
+                                        &min_bytes,
+                                        &max_bytes,
+                                        options.value_type,
+                                    ),
+                                    ScanCompareType::GreaterThan => {
+                                        compare_gt(current, &value_bytes, options.value_type)
+                                    }
+                                    ScanCompareType::LessThan => {
+                                        compare_lt(current, &value_bytes, options.value_type)
+                                    }
+                                    ScanCompareType::Fuzzy => compare_fuzzy(
+                                        current,
+                                        &value_bytes,
+                                        options.value_type,
+                                        options.fuzzy_tolerance,
+                                    ),
+                                    _ => false,
+                                };
+
+                                if matches {
+                                    region_results.push(ScanResultEx {
+                                        address: chunk_base + i,
+                                        value: current.to_vec(),
+                                        previous_value: None,
+                                        first_value: Some(current.to_vec()),
+                                    });
+
+                                    // Early exit if we have too many results from this region
+                                    if region_results.len() >= 100_000 {
+                                        break;
+                                    }
                                 }
+
+                                i += step;
                             }
 
-                            i += step;
+                            offset += data.len();
                         }
-
-                        // Advance by actual read amount to handle split regions correctly
-                        offset += data.len();
-                    }
-                    Err(e) => {
-                        // Skip unreadable regions - this is normal for guard pages, etc.
-                        trace!(target: "ghost_core::scanner", 
-                            address = format!("0x{:x}", chunk_base),
-                            error = %e,
-                            "Skipping unreadable chunk");
-
-                        // Skip the requested chunk size
-                        offset += chunk_size;
+                        Err(_) => {
+                            // Skip unreadable chunks silently
+                            offset += chunk_size;
+                        }
                     }
                 }
 
-                // Check max results
-                if options.max_results > 0 && results.len() >= options.max_results {
-                    break;
-                }
-            }
+                regions_scanned.fetch_add(1, Ordering::Relaxed);
+                region_results
+            })
+            .collect();
 
-            regions_scanned += 1;
-
-            // Update progress periodically
-            if regions_scanned.is_multiple_of(10) || regions_scanned == regions_total {
-                self.update_progress(
-                    session_id,
-                    ScanProgress {
-                        scan_id: session_id,
-                        phase: "Scanning memory".into(),
-                        regions_scanned,
-                        regions_total,
-                        bytes_scanned,
-                        bytes_total: total_bytes,
-                        results_found: results.len() as u32,
-                        elapsed_ms: start_time.elapsed().as_millis() as u64,
-                        complete: false,
-                        cancelled: self.is_cancelled(session_id),
-                    },
-                );
-            }
-
-            // Check max results
-            if options.max_results > 0 && results.len() >= options.max_results {
-                break;
-            }
-        }
+        // Apply max_results limit after parallel collection
+        let final_results: Vec<ScanResultEx> = if options.max_results > 0 {
+            results.into_iter().take(options.max_results).collect()
+        } else {
+            results
+        };
 
         let elapsed_ms = start_time.elapsed().as_millis() as u64;
-        let results_found = results.len() as u32;
+        let results_found = final_results.len() as u32;
+        let total_bytes_scanned = bytes_scanned.load(Ordering::Relaxed);
+        let total_addresses_checked = addresses_checked.load(Ordering::Relaxed);
+        let total_regions_scanned = regions_scanned.load(Ordering::Relaxed);
 
         info!(target: "ghost_core::scanner",
             scan_id = session_id.0,
             results = results_found,
-            bytes_scanned = bytes_scanned,
-            regions_scanned = regions_scanned,
+            bytes_scanned = total_bytes_scanned,
+            regions_scanned = total_regions_scanned,
             elapsed_ms = elapsed_ms,
             cancelled = self.is_cancelled(session_id),
             "Initial scan complete");
@@ -503,7 +463,7 @@ impl Scanner {
                 Error::Internal(format!("Lock poisoned: {}", e))
             })?;
             if let Some(session) = sessions.get_mut(&session_id) {
-                session.results = results;
+                session.results = final_results;
                 session.scan_count = 1;
                 session.last_scan_at = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -520,9 +480,9 @@ impl Scanner {
             ScanProgress {
                 scan_id: session_id,
                 phase: "Complete".into(),
-                regions_scanned,
+                regions_scanned: total_regions_scanned,
                 regions_total,
-                bytes_scanned,
+                bytes_scanned: total_bytes_scanned,
                 bytes_total: total_bytes,
                 results_found,
                 elapsed_ms,
@@ -532,15 +492,15 @@ impl Scanner {
         );
 
         let scan_rate = if elapsed_ms > 0 {
-            (addresses_checked * 1000) / elapsed_ms
+            (total_addresses_checked * 1000) / elapsed_ms
         } else {
-            addresses_checked
+            total_addresses_checked
         };
 
         Ok(ScanStats {
-            addresses_checked,
-            bytes_scanned,
-            regions_scanned,
+            addresses_checked: total_addresses_checked,
+            bytes_scanned: total_bytes_scanned,
+            regions_scanned: total_regions_scanned,
             elapsed_ms,
             results_found,
             scan_rate,
@@ -769,24 +729,34 @@ impl Scanner {
     }
 
     /// Get results from a session
+    ///
+    /// Only clones the requested slice of results, not the entire session.
     pub fn get_results(
         &self,
         session_id: ScanId,
         offset: usize,
         limit: usize,
     ) -> Vec<ScanResultEx> {
-        self.sessions
-            .read()
-            .ok()
-            .and_then(|s| s.get(&session_id).cloned())
-            .map(|s| {
-                s.results
-                    .into_iter()
-                    .skip(offset)
-                    .take(if limit == 0 { usize::MAX } else { limit })
-                    .collect()
-            })
-            .unwrap_or_default()
+        let sessions = match self.sessions.read() {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(target: "ghost_core::scanner", error = %e, "Failed to acquire session lock for get_results");
+                return Vec::new();
+            }
+        };
+
+        let Some(session) = sessions.get(&session_id) else {
+            return Vec::new();
+        };
+
+        let effective_limit = if limit == 0 { usize::MAX } else { limit };
+        let end = (offset.saturating_add(effective_limit)).min(session.results.len());
+
+        if offset >= session.results.len() {
+            return Vec::new();
+        }
+
+        session.results[offset..end].to_vec()
     }
 
     /// Get result count for a session
@@ -2085,5 +2055,260 @@ mod tests {
             .unwrap();
 
         assert_eq!(scanner.get_result_count(id), 3);
+    }
+
+    // ========================================================================
+    // Parallel Scanning Tests
+    // ========================================================================
+
+    #[test]
+    fn test_parallel_scan_multiple_regions() {
+        use ghost_common::{MemoryType, Protection};
+        use std::sync::Arc;
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Create multiple regions with test data
+        let test_data1: Arc<Vec<u8>> = Arc::new(vec![42, 0, 0, 0, 0, 0, 0, 0, 42, 0, 0, 0]);
+        let test_data2: Arc<Vec<u8>> = Arc::new(vec![42, 0, 0, 0, 42, 0, 0, 0]);
+        let test_data3: Arc<Vec<u8>> = Arc::new(vec![0, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0]);
+
+        let regions = vec![
+            MemoryRegion {
+                base: 0x1000,
+                size: test_data1.len(),
+                protection: Protection::new(true, true, false),
+                state: MemoryState::Commit,
+                region_type: MemoryType::Private,
+            },
+            MemoryRegion {
+                base: 0x2000,
+                size: test_data2.len(),
+                protection: Protection::new(true, true, false),
+                state: MemoryState::Commit,
+                region_type: MemoryType::Private,
+            },
+            MemoryRegion {
+                base: 0x3000,
+                size: test_data3.len(),
+                protection: Protection::new(true, true, false),
+                state: MemoryState::Commit,
+                region_type: MemoryType::Private,
+            },
+        ];
+
+        let d1 = test_data1.clone();
+        let d2 = test_data2.clone();
+        let d3 = test_data3.clone();
+
+        let read_memory = move |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let (base, data) = if addr >= 0x3000 {
+                (0x3000, &d3)
+            } else if addr >= 0x2000 {
+                (0x2000, &d2)
+            } else {
+                (0x1000, &d1)
+            };
+            let offset = addr - base;
+            if offset + size <= data.len() {
+                Ok(data[offset..offset + size].to_vec())
+            } else {
+                Ok(data[offset..].to_vec())
+            }
+        };
+
+        let stats = scanner
+            .initial_scan(id, "42", &regions, read_memory)
+            .unwrap();
+
+        // Should find: 2 in region1, 2 in region2, 2 in region3 = 6 total
+        assert_eq!(stats.results_found, 6);
+        assert_eq!(stats.regions_scanned, 3);
+    }
+
+    #[test]
+    fn test_parallel_scan_cancellation() {
+        use ghost_common::{MemoryType, Protection};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let scanner = Arc::new(Scanner::new());
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Create many regions to ensure parallel execution
+        let regions: Vec<MemoryRegion> = (0..100)
+            .map(|i| MemoryRegion {
+                base: 0x1000 + i * 0x1000,
+                size: 0x100,
+                protection: Protection::new(true, true, false),
+                state: MemoryState::Commit,
+                region_type: MemoryType::Private,
+            })
+            .collect();
+
+        let read_count = Arc::new(AtomicUsize::new(0));
+        let read_count_clone = read_count.clone();
+        let scanner_clone = scanner.clone();
+
+        let read_memory = move |_addr: usize, size: usize| -> Result<Vec<u8>> {
+            let count = read_count_clone.fetch_add(1, Ordering::SeqCst);
+            if count >= 10 {
+                // Trigger cancellation through the scanner API
+                scanner_clone.cancel_session(id);
+            }
+            Ok(vec![0u8; size])
+        };
+
+        let _stats = scanner.initial_scan(id, "42", &regions, read_memory);
+
+        // Verify cancellation was triggered
+        assert!(scanner.is_cancelled(id));
+    }
+
+    #[test]
+    fn test_get_results_edge_cases() {
+        let scanner = Scanner::new();
+        let id = scanner.create_session(ScanOptions::default());
+
+        // Add some results
+        {
+            let mut sessions = scanner.sessions.write().unwrap();
+            if let Some(session) = sessions.get_mut(&id) {
+                for i in 0..10 {
+                    session.results.push(ScanResultEx {
+                        address: 0x1000 + i * 4,
+                        value: vec![i as u8],
+                        previous_value: None,
+                        first_value: None,
+                    });
+                }
+            }
+        }
+
+        // Test offset beyond results
+        let empty = scanner.get_results(id, 100, 10);
+        assert!(empty.is_empty());
+
+        // Test exact boundary
+        let exact = scanner.get_results(id, 9, 1);
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].address, 0x1000 + 9 * 4);
+
+        // Test non-existent session
+        let nonexistent = scanner.get_results(ScanId(999), 0, 10);
+        assert!(nonexistent.is_empty());
+
+        // Test zero offset, zero limit (should return all)
+        let all = scanner.get_results(id, 0, 0);
+        assert_eq!(all.len(), 10);
+    }
+
+    #[test]
+    fn test_parallel_scan_empty_regions() {
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        let regions: Vec<MemoryRegion> = vec![];
+
+        let read_memory = |_addr: usize, _size: usize| -> Result<Vec<u8>> { Ok(vec![]) };
+
+        let stats = scanner
+            .initial_scan(id, "42", &regions, read_memory)
+            .unwrap();
+
+        assert_eq!(stats.results_found, 0);
+        assert_eq!(stats.regions_scanned, 0);
+    }
+
+    #[test]
+    fn test_parallel_scan_large_region_chunking() {
+        use ghost_common::{MemoryType, Protection};
+        use std::sync::Arc;
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Create a region larger than MAX_CHUNK_SIZE (4MB) to test chunking
+        let large_size = 5 * 1024 * 1024; // 5MB
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: large_size,
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let chunk_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let chunk_count_clone = chunk_count.clone();
+
+        let read_memory = move |_addr: usize, size: usize| -> Result<Vec<u8>> {
+            chunk_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            // Return zeros (no matches)
+            Ok(vec![0u8; size])
+        };
+
+        let stats = scanner
+            .initial_scan(id, "42", &regions, read_memory)
+            .unwrap();
+
+        // Should have been split into at least 2 chunks (5MB / 4MB = 2)
+        assert!(chunk_count.load(std::sync::atomic::Ordering::SeqCst) >= 2);
+        assert_eq!(stats.results_found, 0);
+    }
+
+    #[test]
+    fn test_scan_progress_tracking() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: 0x100,
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let read_memory = |_addr: usize, size: usize| -> Result<Vec<u8>> { Ok(vec![0u8; size]) };
+
+        scanner
+            .initial_scan(id, "42", &regions, read_memory)
+            .unwrap();
+
+        // Check final progress
+        let progress = scanner.get_progress(id);
+        assert!(progress.is_some());
+        let p = progress.unwrap();
+        assert!(p.complete);
+        assert!(!p.cancelled);
+        assert_eq!(p.regions_scanned, 1);
     }
 }
