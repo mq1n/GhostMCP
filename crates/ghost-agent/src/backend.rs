@@ -1002,12 +1002,22 @@ impl InProcessBackend {
                 let value_str = request.params["value"]
                     .as_str()
                     .ok_or(Error::Internal("Missing value".into()))?;
-                let type_str = request.params["type"].as_str().unwrap_or("i32");
+                let type_str = request.params["value_type"].as_str().unwrap_or("i32");
                 let value_type = parse_value_type(type_str)?;
                 tracing::debug!(target: "ghost_agent::backend", value = value_str, value_type = type_str, "Searching memory");
                 let value_bytes = ghost_core::memory::value_to_bytes(value_str, value_type)?;
-                let start = request.params["start"].as_u64().map(|v| v as usize);
-                let end = request.params["end"].as_u64().map(|v| v as usize);
+                let start = request.params["start_address"]
+                    .as_str()
+                    .and_then(|s| {
+                        let s = s.trim_start_matches("0x").trim_start_matches("0X");
+                        usize::from_str_radix(s, 16).ok()
+                    });
+                let end = request.params["end_address"]
+                    .as_str()
+                    .and_then(|s| {
+                        let s = s.trim_start_matches("0x").trim_start_matches("0X");
+                        usize::from_str_radix(s, 16).ok()
+                    });
                 let results = self.search_value(&value_bytes, value_type, start, end)?;
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "Memory search complete");
                 Ok(serde_json::to_value(results)?)
