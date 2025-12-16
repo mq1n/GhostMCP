@@ -88,18 +88,18 @@ fn parse_address(value: &serde_json::Value) -> Result<usize> {
     // Try as string
     if let Some(s) = value.as_str() {
         let s = s.trim();
-        
+
         // If it has 0x/0X prefix, parse as hex
         if let Some(hex_str) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
             return usize::from_str_radix(hex_str, 16)
                 .map_err(|_| Error::Internal(format!("Invalid hex address: {}", value)));
         }
-        
+
         // Otherwise, try decimal first (for addresses from scan results like "1254177897440")
         if let Ok(n) = s.parse::<usize>() {
             return Ok(n);
         }
-        
+
         // Fallback: try as hex without prefix (legacy compatibility)
         return usize::from_str_radix(s, 16)
             .map_err(|_| Error::Internal(format!("Invalid address format: {}", value)));
@@ -690,7 +690,8 @@ impl InProcessBackend {
                     .or_else(|| request.params["data"].as_str())
                     .ok_or(Error::Internal("Missing bytes/data parameter".into()))?;
                 // Strip spaces from hex string (e.g., "2C 01 00 00" -> "2C010000")
-                let bytes_hex_clean: String = bytes_hex.chars().filter(|c| !c.is_whitespace()).collect();
+                let bytes_hex_clean: String =
+                    bytes_hex.chars().filter(|c| !c.is_whitespace()).collect();
                 let bytes = hex::decode(&bytes_hex_clean)
                     .map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
 
@@ -3888,8 +3889,8 @@ impl MultiClientBackend {
             .ok_or(Error::Internal("Missing bytes/data parameter".into()))?;
         // Strip spaces from hex string (e.g., "2C 01 00 00" -> "2C010000")
         let bytes_hex_clean: String = bytes_hex.chars().filter(|c| !c.is_whitespace()).collect();
-        let bytes =
-            hex::decode(&bytes_hex_clean).map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
+        let bytes = hex::decode(&bytes_hex_clean)
+            .map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
 
         // Read original bytes for patch tracking
         let original = self.backend.read(addr, bytes.len())?;
@@ -5516,7 +5517,11 @@ impl RequestHandler for MultiClientBackend {
             // Safety control operations bypass capability checks - they're essential escape hatches
             let is_safety_control = matches!(
                 method.as_str(),
-                "safety_set_mode" | "safety_approve" | "safety_reset" | "safety_status" | "safety_config"
+                "safety_set_mode"
+                    | "safety_approve"
+                    | "safety_reset"
+                    | "safety_status"
+                    | "safety_config"
             );
 
             // Expert mode bypasses capability checks - user has explicitly opted into full access

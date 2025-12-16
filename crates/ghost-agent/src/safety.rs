@@ -337,7 +337,11 @@ impl SafetyGuard {
         // Without this, educational mode would create an unrecoverable deadlock
         if matches!(
             tool_name,
-            "safety_set_mode" | "safety_approve" | "safety_reset" | "safety_status" | "safety_config"
+            "safety_set_mode"
+                | "safety_approve"
+                | "safety_reset"
+                | "safety_status"
+                | "safety_config"
         ) {
             let mut stats = self.stats.write();
             stats.allowed += 1;

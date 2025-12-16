@@ -1143,11 +1143,20 @@ mod live_tests {
     async fn test_capabilities_tool_count() {
         println!("\n=== Capabilities Tool Count ===\n");
 
-        let _stubs = StubServers::start().await;
+        let stubs = StubServers::start().await;
         let mut results = MultiServerResults::default();
 
         for server in all_servers() {
             if server.transport != "tcp" {
+                continue;
+            }
+
+            // Skip if connecting to external server (not our stub) - they may be old versions
+            if !stubs.is_active(server.port) {
+                results.record_skip(
+                    &format!("{}_tool_count", server.name),
+                    "external server (not stub)",
+                );
                 continue;
             }
 
@@ -1169,7 +1178,17 @@ mod live_tests {
 
             match result {
                 Ok(response) => {
-                    if let Some(count) = response.get("tool_count").and_then(|v| v.as_u64()) {
+                    // Response is wrapped in ToolResult format: {"content": [{"text": "..."}], "isError": false}
+                    // Extract the JSON text from content[0].text and parse it
+                    let tool_count = response
+                        .get("content")
+                        .and_then(|c| c.get(0))
+                        .and_then(|c| c.get("text"))
+                        .and_then(|t| t.as_str())
+                        .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+                        .and_then(|parsed| parsed.get("tool_count").and_then(|v| v.as_u64()));
+
+                    if let Some(count) = tool_count {
                         let test_name = format!("{}_tool_count", server.name);
                         if count <= MAX_TOOLS_PER_SERVER as u64 {
                             results.record_pass(&test_name);

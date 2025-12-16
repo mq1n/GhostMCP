@@ -279,6 +279,7 @@ impl SharedMetaTools {
             serde_json::json!({
                 "server": self.identity.name,
                 "total_tools": registry.len(),
+                "tool_count": registry.len(),
                 "categories": summary
             })
         };
