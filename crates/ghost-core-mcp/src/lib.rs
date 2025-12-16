@@ -164,45 +164,29 @@ impl ToolHandlerFn for CoreToolHandler {
                     .await
                     .map_err(|e| McpError::Handler(e.to_string())),
 
-                // Local tools: session info
+                // Local tools: session info (uses cached status to avoid blocking)
                 "session_info" => {
-                    // Check connection status first
-                    if !agent.is_connected() {
-                        let _ = agent.connect().await;
-                    }
-
                     if let Some(s) = agent.status().await {
-                        // Agent connected, try to get full session info from agent
-                        match agent.request_with_reconnect(&name, args.clone()).await {
-                            Ok(res) => Ok(serde_json::json!({
-                                "content": [{ "type": "text", "text": res.to_string() }]
-                            })),
-                            Err(e) => {
-                                // Fallback to basic status if tool call fails but we have status
-                                debug!(target: "ghost_core_mcp", error = %e, "Session info tool call failed, using cached status");
-                                let started_at = std::time::SystemTime::now()
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .map(|d| d.as_secs())
-                                    .unwrap_or(0);
-                                let session = serde_json::json!({
-                                    "session_id": format!("ghost-{}", s.pid),
-                                    "attached": true,
-                                    "pid": s.pid,
-                                    "process_name": s.process_name,
-                                    "arch": s.arch,
-                                    "agent_version": s.version,
-                                    "started_at": started_at,
-                                    "message": "Basic session info (agent tool call failed)"
-                                });
-                                let text =
-                                    serde_json::to_string_pretty(&session).unwrap_or_default();
-                                Ok(serde_json::json!({
-                                    "content": [{ "type": "text", "text": text }]
-                                }))
-                            }
-                        }
+                        // Use cached status - no agent call needed
+                        let started_at = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        let session = serde_json::json!({
+                            "session_id": format!("ghost-{}", s.pid),
+                            "attached": true,
+                            "pid": s.pid,
+                            "process_name": s.process_name,
+                            "arch": s.arch,
+                            "agent_version": s.version,
+                            "started_at": started_at
+                        });
+                        let text = serde_json::to_string_pretty(&session).unwrap_or_default();
+                        Ok(serde_json::json!({
+                            "content": [{ "type": "text", "text": text }]
+                        }))
                     } else {
-                        // Agent not connected - legacy behavior
+                        // Agent not connected
                         debug!(target: "ghost_core_mcp", "Session info: not attached");
                         let session = serde_json::json!({
                             "session_id": null,
@@ -213,6 +197,76 @@ impl ToolHandlerFn for CoreToolHandler {
                             "message": "No process attached. Use session_attach or process_spawn to attach."
                         });
                         let text = serde_json::to_string_pretty(&session).unwrap_or_default();
+                        Ok(serde_json::json!({
+                            "content": [{ "type": "text", "text": text }]
+                        }))
+                    }
+                }
+
+                // Local tools: agent status and reconnect
+                "agent_status" => {
+                    let health = agent.health().await;
+                    let status = agent.status().await;
+                    let connected = agent.is_connected();
+
+                    let status_json = serde_json::json!({
+                        "connected": connected,
+                        "connection_state": format!("{:?}", health.state),
+                        "failures": health.failures,
+                        "last_error": health.last_error,
+                        "agent": status.map(|s| serde_json::json!({
+                            "pid": s.pid,
+                            "process_name": s.process_name,
+                            "arch": s.arch,
+                            "version": s.version,
+                            "client_count": s.client_count
+                        }))
+                    });
+                    let text = serde_json::to_string_pretty(&status_json).unwrap_or_default();
+                    Ok(serde_json::json!({
+                        "content": [{ "type": "text", "text": text }]
+                    }))
+                }
+
+                "agent_reconnect" => {
+                    let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                    if force || !agent.is_connected() {
+                        match agent.reconnect().await {
+                            Ok(()) => {
+                                let status = agent.status().await;
+                                let result = serde_json::json!({
+                                    "success": true,
+                                    "message": "Reconnected to agent",
+                                    "agent": status.map(|s| serde_json::json!({
+                                        "pid": s.pid,
+                                        "process_name": s.process_name,
+                                        "version": s.version
+                                    }))
+                                });
+                                let text = serde_json::to_string_pretty(&result).unwrap_or_default();
+                                Ok(serde_json::json!({
+                                    "content": [{ "type": "text", "text": text }]
+                                }))
+                            }
+                            Err(e) => {
+                                let result = serde_json::json!({
+                                    "success": false,
+                                    "message": format!("Failed to reconnect: {}", e)
+                                });
+                                let text = serde_json::to_string_pretty(&result).unwrap_or_default();
+                                Ok(serde_json::json!({
+                                    "content": [{ "type": "text", "text": text }],
+                                    "isError": true
+                                }))
+                            }
+                        }
+                    } else {
+                        let result = serde_json::json!({
+                            "success": true,
+                            "message": "Already connected (use force=true to force reconnect)"
+                        });
+                        let text = serde_json::to_string_pretty(&result).unwrap_or_default();
                         Ok(serde_json::json!({
                             "content": [{ "type": "text", "text": text }]
                         }))
