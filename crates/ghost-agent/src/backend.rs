@@ -1317,12 +1317,23 @@ impl InProcessBackend {
                 Ok(serde_json::json!({"count": count}))
             }
             "scan_progress" => {
-                let progress = self.scanner.get_progress();
+                // Support both per-session and any-session progress queries
+                let progress = if let Ok(scan_id) = parse_scan_id(&request.params["scan_id"]) {
+                    self.scanner.get_progress(scan_id)
+                } else {
+                    self.scanner.get_any_progress()
+                };
                 Ok(serde_json::to_value(progress)?)
             }
             "scan_cancel" => {
-                self.scanner.cancel();
-                tracing::info!(target: "ghost_agent::backend", "Scan cancelled");
+                // Support both per-session and global cancel
+                if let Ok(scan_id) = parse_scan_id(&request.params["scan_id"]) {
+                    self.scanner.cancel_session(scan_id);
+                    tracing::info!(target: "ghost_agent::backend", scan_id = scan_id.0, "Scan session cancelled");
+                } else {
+                    self.scanner.cancel();
+                    tracing::info!(target: "ghost_agent::backend", "All scans cancelled");
+                }
                 Ok(serde_json::json!({"cancelled": true}))
             }
             "scan_close" => {

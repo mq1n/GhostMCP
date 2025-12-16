@@ -39,10 +39,10 @@ pub struct Scanner {
     sessions: RwLock<HashMap<ScanId, ScanSession>>,
     /// Next session ID
     next_id: AtomicU32,
-    /// Global cancel flag
-    cancel_flag: Arc<AtomicBool>,
-    /// Current progress (for real-time updates)
-    current_progress: RwLock<Option<ScanProgress>>,
+    /// Per-session cancel flags (allows concurrent scans without interference)
+    cancel_flags: RwLock<HashMap<ScanId, Arc<AtomicBool>>>,
+    /// Per-session progress (allows concurrent progress tracking)
+    progress: RwLock<HashMap<ScanId, ScanProgress>>,
 }
 
 impl Scanner {
@@ -50,29 +50,58 @@ impl Scanner {
         Self {
             sessions: RwLock::new(HashMap::new()),
             next_id: AtomicU32::new(1),
-            cancel_flag: Arc::new(AtomicBool::new(false)),
-            current_progress: RwLock::new(None),
+            cancel_flags: RwLock::new(HashMap::new()),
+            progress: RwLock::new(HashMap::new()),
         }
     }
 
-    /// Get the cancel flag for external cancellation
-    pub fn cancel_flag(&self) -> Arc<AtomicBool> {
-        self.cancel_flag.clone()
+    /// Get the cancel flag for a specific session
+    pub fn cancel_flag(&self, session_id: ScanId) -> Option<Arc<AtomicBool>> {
+        self.cancel_flags.read().ok()?.get(&session_id).cloned()
     }
 
-    /// Cancel the current scan
+    /// Cancel a specific scan session
+    pub fn cancel_session(&self, session_id: ScanId) {
+        if let Ok(flags) = self.cancel_flags.read() {
+            if let Some(flag) = flags.get(&session_id) {
+                flag.store(true, Ordering::SeqCst);
+            }
+        }
+    }
+
+    /// Cancel all active scans (for backwards compatibility)
     pub fn cancel(&self) {
-        self.cancel_flag.store(true, Ordering::SeqCst);
+        if let Ok(flags) = self.cancel_flags.read() {
+            for flag in flags.values() {
+                flag.store(true, Ordering::SeqCst);
+            }
+        }
     }
 
-    /// Reset cancel flag before a new scan
-    pub fn reset_cancel(&self) {
-        self.cancel_flag.store(false, Ordering::SeqCst);
+    /// Reset cancel flag for a specific session
+    fn reset_cancel(&self, session_id: ScanId) {
+        if let Ok(mut flags) = self.cancel_flags.write() {
+            let flag = flags.entry(session_id).or_insert_with(|| Arc::new(AtomicBool::new(false)));
+            flag.store(false, Ordering::SeqCst);
+        }
     }
 
-    /// Check if cancelled
-    pub fn is_cancelled(&self) -> bool {
-        self.cancel_flag.load(Ordering::SeqCst)
+    /// Check if a specific session is cancelled
+    fn is_cancelled(&self, session_id: ScanId) -> bool {
+        self.cancel_flags
+            .read()
+            .ok()
+            .and_then(|flags| flags.get(&session_id).map(|f| f.load(Ordering::SeqCst)))
+            .unwrap_or(false)
+    }
+
+    /// Check if any scan is cancelled (for backwards compatibility)
+    pub fn is_any_cancelled(&self) -> bool {
+        self.cancel_flags
+            .read()
+            .ok()
+            .map(|flags| flags.values().any(|f| f.load(Ordering::SeqCst)))
+            .unwrap_or(false)
     }
 
     /// Create a new scan session
@@ -158,15 +187,20 @@ impl Scanner {
         }
     }
 
-    /// Get current scan progress
-    pub fn get_progress(&self) -> Option<ScanProgress> {
-        self.current_progress.read().ok()?.clone()
+    /// Get progress for a specific session
+    pub fn get_progress(&self, session_id: ScanId) -> Option<ScanProgress> {
+        self.progress.read().ok()?.get(&session_id).cloned()
     }
 
-    /// Update progress (internal)
-    fn update_progress(&self, progress: ScanProgress) {
-        if let Ok(mut p) = self.current_progress.write() {
-            *p = Some(progress);
+    /// Get progress for any active scan (for backwards compatibility)
+    pub fn get_any_progress(&self) -> Option<ScanProgress> {
+        self.progress.read().ok()?.values().next().cloned()
+    }
+
+    /// Update progress for a session (internal)
+    fn update_progress(&self, session_id: ScanId, progress: ScanProgress) {
+        if let Ok(mut p) = self.progress.write() {
+            p.insert(session_id, progress);
         }
     }
 
@@ -190,7 +224,7 @@ impl Scanner {
     where
         F: Fn(usize, usize) -> Result<Vec<u8>>,
     {
-        self.reset_cancel();
+        self.reset_cancel(session_id);
         let start_time = Instant::now();
 
         info!(target: "ghost_core::scanner", 
@@ -254,7 +288,7 @@ impl Scanner {
         let value_size = type_size(options.value_type);
 
         // Update initial progress
-        self.update_progress(ScanProgress {
+        self.update_progress(session_id, ScanProgress {
             scan_id: session_id,
             phase: "Scanning memory".into(),
             regions_scanned: 0,
@@ -270,14 +304,14 @@ impl Scanner {
         const MAX_CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
         for region in &filtered_regions {
-            if self.is_cancelled() {
+            if self.is_cancelled(session_id) {
                 break;
             }
 
             // Process region in chunks
             let mut offset = 0;
             while offset < region.size {
-                if self.is_cancelled() {
+                if self.is_cancelled(session_id) {
                     break;
                 }
 
@@ -293,7 +327,7 @@ impl Scanner {
                         let mut i = 0;
 
                         while i + value_size <= data.len() {
-                            if self.is_cancelled() {
+                            if self.is_cancelled(session_id) {
                                 break;
                             }
 
@@ -361,7 +395,7 @@ impl Scanner {
 
             // Update progress periodically
             if regions_scanned.is_multiple_of(10) || regions_scanned == regions_total {
-                self.update_progress(ScanProgress {
+                self.update_progress(session_id, ScanProgress {
                     scan_id: session_id,
                     phase: "Scanning memory".into(),
                     regions_scanned,
@@ -371,7 +405,7 @@ impl Scanner {
                     results_found: results.len() as u32,
                     elapsed_ms: start_time.elapsed().as_millis() as u64,
                     complete: false,
-                    cancelled: self.is_cancelled(),
+                    cancelled: self.is_cancelled(session_id),
                 });
             }
 
@@ -390,7 +424,7 @@ impl Scanner {
             bytes_scanned = bytes_scanned,
             regions_scanned = regions_scanned,
             elapsed_ms = elapsed_ms,
-            cancelled = self.is_cancelled(),
+            cancelled = self.is_cancelled(session_id),
             "Initial scan complete");
 
         // Update session with results
@@ -412,7 +446,7 @@ impl Scanner {
         }
 
         // Final progress update
-        self.update_progress(ScanProgress {
+        self.update_progress(session_id, ScanProgress {
             scan_id: session_id,
             phase: "Complete".into(),
             regions_scanned,
@@ -422,7 +456,7 @@ impl Scanner {
             results_found,
             elapsed_ms,
             complete: true,
-            cancelled: self.is_cancelled(),
+            cancelled: self.is_cancelled(session_id),
         });
 
         let scan_rate = if elapsed_ms > 0 {
@@ -462,7 +496,7 @@ impl Scanner {
     where
         F: Fn(usize, usize) -> Result<Vec<u8>>,
     {
-        self.reset_cancel();
+        self.reset_cancel(session_id);
         let start_time = Instant::now();
 
         info!(target: "ghost_core::scanner",
@@ -496,7 +530,7 @@ impl Scanner {
         let mut filtered_results: Vec<ScanResultEx> = Vec::new();
         let mut addresses_checked: u64 = 0;
 
-        self.update_progress(ScanProgress {
+        self.update_progress(session_id, ScanProgress {
             scan_id: session_id,
             phase: "Filtering results".into(),
             regions_scanned: 0,
@@ -510,7 +544,7 @@ impl Scanner {
         });
 
         for (idx, result) in results.iter_mut().enumerate() {
-            if self.is_cancelled() {
+            if self.is_cancelled(session_id) {
                 break;
             }
 
@@ -572,7 +606,7 @@ impl Scanner {
 
             // Update progress periodically
             if idx % 1000 == 0 {
-                self.update_progress(ScanProgress {
+                self.update_progress(session_id, ScanProgress {
                     scan_id: session_id,
                     phase: "Filtering results".into(),
                     regions_scanned: idx as u32,
@@ -613,7 +647,7 @@ impl Scanner {
             }
         }
 
-        self.update_progress(ScanProgress {
+        self.update_progress(session_id, ScanProgress {
             scan_id: session_id,
             phase: "Complete".into(),
             regions_scanned: total_results,
@@ -623,7 +657,7 @@ impl Scanner {
             results_found,
             elapsed_ms,
             complete: true,
-            cancelled: self.is_cancelled(),
+            cancelled: self.is_cancelled(session_id),
         });
 
         let scan_rate = if elapsed_ms > 0 {
@@ -1046,13 +1080,21 @@ mod tests {
     #[test]
     fn test_scanner_cancel_flag() {
         let scanner = Scanner::new();
-        assert!(!scanner.is_cancelled());
-
+        let session_id = scanner.create_session(ScanOptions::default());
+        
+        // Per-session cancellation
+        assert!(!scanner.is_cancelled(session_id));
+        
+        scanner.cancel_session(session_id);
+        assert!(scanner.is_cancelled(session_id));
+        
+        scanner.reset_cancel(session_id);
+        assert!(!scanner.is_cancelled(session_id));
+        
+        // Global cancellation (backwards compatibility)
+        assert!(!scanner.is_any_cancelled());
         scanner.cancel();
-        assert!(scanner.is_cancelled());
-
-        scanner.reset_cancel();
-        assert!(!scanner.is_cancelled());
+        assert!(scanner.is_any_cancelled());
     }
 
     // ========================================================================
