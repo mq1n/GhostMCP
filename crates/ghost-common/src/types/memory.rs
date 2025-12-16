@@ -28,12 +28,17 @@ impl Protection {
         const PAGE_READWRITE: u32 = 0x04;
         const PAGE_WRITECOPY: u32 = 0x08;
 
+        // Mask out protection modifiers (PAGE_GUARD, PAGE_NOCACHE, PAGE_WRITECOMBINE)
+        // to get the base protection type
+        const PROTECTION_MASK: u32 = 0xFF;
+        let base_protect = protect & PROTECTION_MASK;
+
         let execute = matches!(
-            protect,
+            base_protect,
             PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
         );
         let read = matches!(
-            protect,
+            base_protect,
             PAGE_READONLY
                 | PAGE_READWRITE
                 | PAGE_WRITECOPY
@@ -42,7 +47,7 @@ impl Protection {
                 | PAGE_EXECUTE_WRITECOPY
         );
         let write = matches!(
-            protect,
+            base_protect,
             PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
         );
 
@@ -141,5 +146,23 @@ mod tests {
     fn test_memory_type_variants() {
         assert_ne!(MemoryType::Image, MemoryType::Mapped);
         assert_ne!(MemoryType::Mapped, MemoryType::Private);
+    }
+
+    #[test]
+    fn test_protection_from_windows_with_guard_modifier() {
+        // PAGE_READWRITE | PAGE_GUARD = 0x04 | 0x100 = 0x104
+        let prot = Protection::from_windows(0x104);
+        assert!(prot.read);
+        assert!(prot.write);
+        assert!(!prot.execute);
+    }
+
+    #[test]
+    fn test_protection_from_windows_with_nocache_modifier() {
+        // PAGE_READONLY | PAGE_NOCACHE = 0x02 | 0x200 = 0x202
+        let prot = Protection::from_windows(0x202);
+        assert!(prot.read);
+        assert!(!prot.write);
+        assert!(!prot.execute);
     }
 }

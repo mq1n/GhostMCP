@@ -2268,9 +2268,10 @@ impl MemoryAccess for InProcessBackend {
                 let chunk_size = (region_scan_end - offset).min(MAX_CHUNK_SIZE);
                 let chunk_base = region.base + offset;
 
-                match self.read(chunk_base, chunk_size) {
+                let actual_read_size = match self.read(chunk_base, chunk_size) {
                     Ok(data) => {
-                        total_scanned += data.len();
+                        let read_len = data.len();
+                        total_scanned += read_len;
                         let mut found = ghost_core::memory::scan_region_for_value(
                             &data,
                             chunk_base,
@@ -2284,16 +2285,20 @@ impl MemoryAccess for InProcessBackend {
                             tracing::info!(target: "ghost_agent::backend", results = results.len(), "Max results reached");
                             return Ok(results);
                         }
+                        read_len
                     }
                     Err(_) => {
                         // Skip silently - region may have become invalid
+                        // Advance by requested chunk_size to move past problematic region
+                        chunk_size
                     }
-                }
+                };
 
                 // Move to next chunk, overlap by value length to catch matches at boundaries
-                let advance = chunk_size.saturating_sub(value.len().saturating_sub(1));
+                // Use actual_read_size instead of chunk_size to avoid skipping memory
+                let advance = actual_read_size.saturating_sub(value.len().saturating_sub(1));
                 offset += if advance == 0 {
-                    chunk_size.max(1)
+                    actual_read_size.max(1)
                 } else {
                     advance
                 };
