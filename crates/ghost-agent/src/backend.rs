@@ -2782,13 +2782,25 @@ impl MemoryAccess for InProcessBackend {
         let mut addr: usize = 0;
 
         unsafe {
+            let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
+
             loop {
                 let mut mbi = MEMORY_BASIC_INFORMATION::default();
-                let result = VirtualQuery(
-                    Some(addr as *const _),
-                    &mut mbi,
-                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-                );
+                // Use VirtualQueryEx for remote process, VirtualQuery for local
+                let result = if self.process_handle.is_some() {
+                    VirtualQueryEx(
+                        process,
+                        Some(addr as *const _),
+                        &mut mbi,
+                        std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                    )
+                } else {
+                    VirtualQuery(
+                        Some(addr as *const _),
+                        &mut mbi,
+                        std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                    )
+                };
 
                 if result == 0 {
                     break;
