@@ -268,7 +268,7 @@ impl ApiOverrideEngine {
 
             BreakpointCondition::HitCount { count, .. } => hit_count == *count,
 
-            BreakpointCondition::HitCountModulo(n) => *n > 0 && hit_count % *n == 0,
+            BreakpointCondition::HitCountModulo(n) => *n > 0 && hit_count.is_multiple_of(*n),
 
             BreakpointCondition::And(conditions) => conditions.iter().all(|c| {
                 self.evaluate_condition(

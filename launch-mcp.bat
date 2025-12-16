@@ -23,4 +23,5 @@ taskkill /F /IM claude.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 cd /d "%~dp0"
+set RUST_LOG=debug
 powershell -ExecutionPolicy Bypass -File "scripts\launch-mcp.ps1" -Build %*

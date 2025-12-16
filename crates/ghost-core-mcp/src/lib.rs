@@ -244,7 +244,8 @@ impl ToolHandlerFn for CoreToolHandler {
                                         "version": s.version
                                     }))
                                 });
-                                let text = serde_json::to_string_pretty(&result).unwrap_or_default();
+                                let text =
+                                    serde_json::to_string_pretty(&result).unwrap_or_default();
                                 Ok(serde_json::json!({
                                     "content": [{ "type": "text", "text": text }]
                                 }))
@@ -254,7 +255,8 @@ impl ToolHandlerFn for CoreToolHandler {
                                     "success": false,
                                     "message": format!("Failed to reconnect: {}", e)
                                 });
-                                let text = serde_json::to_string_pretty(&result).unwrap_or_default();
+                                let text =
+                                    serde_json::to_string_pretty(&result).unwrap_or_default();
                                 Ok(serde_json::json!({
                                     "content": [{ "type": "text", "text": text }],
                                     "isError": true

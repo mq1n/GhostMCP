@@ -234,11 +234,13 @@ pub fn init_logging(config: &LogConfig) {
 }
 
 /// Initialize logging for the agent (DLL context)
+///
+/// Enables file logging to {cwd}/ghost-agent-{pid}.log
 pub fn init_agent_logging() {
     let mut config = LogConfig::minimal();
 
-    // Enable file logging in temp directory with PID to avoid conflicts
-    let mut path = std::env::temp_dir();
+    // Enable file logging in current working directory with PID to avoid conflicts
+    let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     path.push(format!("ghost-agent-{}.log", std::process::id()));
 
     config.file_enabled = true;

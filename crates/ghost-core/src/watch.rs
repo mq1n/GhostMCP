@@ -141,7 +141,7 @@ impl WatchManager {
         }
 
         // Validate address alignment
-        if request.address % (request.size as u64) != 0 {
+        if !request.address.is_multiple_of(request.size as u64) {
             debug!(address = %format!("{:#x}", request.address), size = request.size, "Address not aligned to watch size");
             // Just a warning - hardware may still work
         }

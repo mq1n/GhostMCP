@@ -2430,7 +2430,7 @@ fn read_unicode_string_safe(addr: usize, max_len: usize) -> Option<String> {
     }
 
     // Check alignment - UTF-16 requires 2-byte alignment
-    if addr % 2 != 0 {
+    if !addr.is_multiple_of(2) {
         trace!("Unaligned UTF-16 string address {:#x}", addr);
         return None;
     }

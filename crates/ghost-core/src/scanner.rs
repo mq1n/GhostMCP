@@ -62,10 +62,11 @@ impl Scanner {
 
     /// Cancel a specific scan session
     pub fn cancel_session(&self, session_id: ScanId) {
-        if let Ok(flags) = self.cancel_flags.read() {
-            if let Some(flag) = flags.get(&session_id) {
-                flag.store(true, Ordering::SeqCst);
-            }
+        if let Ok(mut flags) = self.cancel_flags.write() {
+            let flag = flags
+                .entry(session_id)
+                .or_insert_with(|| Arc::new(AtomicBool::new(false)));
+            flag.store(true, Ordering::SeqCst);
         }
     }
 
@@ -81,7 +82,9 @@ impl Scanner {
     /// Reset cancel flag for a specific session
     fn reset_cancel(&self, session_id: ScanId) {
         if let Ok(mut flags) = self.cancel_flags.write() {
-            let flag = flags.entry(session_id).or_insert_with(|| Arc::new(AtomicBool::new(false)));
+            let flag = flags
+                .entry(session_id)
+                .or_insert_with(|| Arc::new(AtomicBool::new(false)));
             flag.store(false, Ordering::SeqCst);
         }
     }
@@ -161,7 +164,10 @@ impl Scanner {
 
     /// Update session comparison type
     pub fn update_session_compare(&self, id: ScanId, compare_type: ScanCompareType) -> Result<()> {
-        let mut sessions = self.sessions.write().map_err(|e| Error::Internal(e.to_string()))?;
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|e| Error::Internal(e.to_string()))?;
         if let Some(session) = sessions.get_mut(&id) {
             session.options.compare_type = compare_type;
             Ok(())
@@ -273,9 +279,14 @@ impl Scanner {
         };
 
         // Filter regions
+        debug!(target: "ghost_core::scanner", "Filtering regions");
         let filtered_regions = filter_regions(regions, &options.region_filter);
         let total_bytes: u64 = filtered_regions.iter().map(|r| r.size as u64).sum();
         let regions_total = filtered_regions.len() as u32;
+        debug!(target: "ghost_core::scanner", 
+            filtered = regions_total,
+            total_bytes = total_bytes,
+            "Regions filtered");
 
         let mut results: Vec<ScanResultEx> = Vec::new();
         let mut bytes_scanned: u64 = 0;
@@ -288,30 +299,63 @@ impl Scanner {
         let value_size = type_size(options.value_type);
 
         // Update initial progress
-        self.update_progress(session_id, ScanProgress {
-            scan_id: session_id,
-            phase: "Scanning memory".into(),
-            regions_scanned: 0,
-            regions_total,
-            bytes_scanned: 0,
-            bytes_total: total_bytes,
-            results_found: 0,
-            elapsed_ms: 0,
-            complete: false,
-            cancelled: false,
-        });
+        self.update_progress(
+            session_id,
+            ScanProgress {
+                scan_id: session_id,
+                phase: "Scanning memory".into(),
+                regions_scanned: 0,
+                regions_total,
+                bytes_scanned: 0,
+                bytes_total: total_bytes,
+                results_found: 0,
+                elapsed_ms: 0,
+                complete: false,
+                cancelled: false,
+            },
+        );
 
         const MAX_CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
+        const TIMEOUT_SECS: u64 = 60;
 
-        for region in &filtered_regions {
-            if self.is_cancelled(session_id) {
+        // Optimize cancellation check by avoiding RwLock in tight loop
+        let cancel_flag = self.cancel_flag(session_id);
+        let check_cancelled = || {
+            if let Some(flag) = &cancel_flag {
+                flag.load(Ordering::Relaxed)
+            } else {
+                false
+            }
+        };
+
+        debug!(target: "ghost_core::scanner", 
+            count = filtered_regions.len(),
+            value_size = value_size,
+            alignment = alignment,
+            "Starting region scan loop");
+
+        for (region_idx, region) in filtered_regions.iter().enumerate() {
+            if region_idx == 0 {
+                debug!(target: "ghost_core::scanner",
+                    base = format!("0x{:x}", region.base),
+                    size = region.size,
+                    "Processing first region");
+            }
+
+            // Check timeout and cancellation less frequently (per region)
+            if start_time.elapsed().as_secs() > TIMEOUT_SECS {
+                warn!(target: "ghost_core::scanner", scan_id = session_id.0, "Scan timed out");
+                return Err(Error::Internal("Scan timed out".into()));
+            }
+
+            if check_cancelled() {
                 break;
             }
 
             // Process region in chunks
             let mut offset = 0;
             while offset < region.size {
-                if self.is_cancelled(session_id) {
+                if check_cancelled() {
                     break;
                 }
 
@@ -320,15 +364,33 @@ impl Scanner {
 
                 match read_memory(chunk_base, chunk_size) {
                     Ok(data) => {
+                        if data.is_empty() {
+                            // Should not happen with valid read_memory, but prevent infinite loop
+                            offset += chunk_size;
+                            continue;
+                        }
+
                         bytes_scanned = bytes_scanned.saturating_add(data.len() as u64);
 
                         // Scan this chunk
-                        let step = if options.fast_scan { alignment } else { 1 };
+                        // Ensure step is at least 1 to prevent infinite loop
+                        let step = if options.fast_scan && alignment > 0 {
+                            alignment
+                        } else {
+                            1
+                        };
                         let mut i = 0;
 
+                        // Optimize inner loop: verify cancellation every 1000 iterations to reduce atomic overhead
+                        let mut loop_count = 0;
+
                         while i + value_size <= data.len() {
-                            if self.is_cancelled(session_id) {
-                                break;
+                            loop_count += 1;
+                            if loop_count >= 1000 {
+                                loop_count = 0;
+                                if check_cancelled() {
+                                    break;
+                                }
                             }
 
                             addresses_checked += 1;
@@ -373,6 +435,9 @@ impl Scanner {
 
                             i += step;
                         }
+
+                        // Advance by actual read amount to handle split regions correctly
+                        offset += data.len();
                     }
                     Err(e) => {
                         // Skip unreadable regions - this is normal for guard pages, etc.
@@ -380,10 +445,11 @@ impl Scanner {
                             address = format!("0x{:x}", chunk_base),
                             error = %e,
                             "Skipping unreadable chunk");
+
+                        // Skip the requested chunk size
+                        offset += chunk_size;
                     }
                 }
-
-                offset += chunk_size;
 
                 // Check max results
                 if options.max_results > 0 && results.len() >= options.max_results {
@@ -394,19 +460,22 @@ impl Scanner {
             regions_scanned += 1;
 
             // Update progress periodically
-            if regions_scanned % 10 == 0 || regions_scanned == regions_total {
-                self.update_progress(session_id, ScanProgress {
-                    scan_id: session_id,
-                    phase: "Scanning memory".into(),
-                    regions_scanned,
-                    regions_total,
-                    bytes_scanned,
-                    bytes_total: total_bytes,
-                    results_found: results.len() as u32,
-                    elapsed_ms: start_time.elapsed().as_millis() as u64,
-                    complete: false,
-                    cancelled: self.is_cancelled(session_id),
-                });
+            if regions_scanned.is_multiple_of(10) || regions_scanned == regions_total {
+                self.update_progress(
+                    session_id,
+                    ScanProgress {
+                        scan_id: session_id,
+                        phase: "Scanning memory".into(),
+                        regions_scanned,
+                        regions_total,
+                        bytes_scanned,
+                        bytes_total: total_bytes,
+                        results_found: results.len() as u32,
+                        elapsed_ms: start_time.elapsed().as_millis() as u64,
+                        complete: false,
+                        cancelled: self.is_cancelled(session_id),
+                    },
+                );
             }
 
             // Check max results
@@ -446,18 +515,21 @@ impl Scanner {
         }
 
         // Final progress update
-        self.update_progress(session_id, ScanProgress {
-            scan_id: session_id,
-            phase: "Complete".into(),
-            regions_scanned,
-            regions_total,
-            bytes_scanned,
-            bytes_total: total_bytes,
-            results_found,
-            elapsed_ms,
-            complete: true,
-            cancelled: self.is_cancelled(session_id),
-        });
+        self.update_progress(
+            session_id,
+            ScanProgress {
+                scan_id: session_id,
+                phase: "Complete".into(),
+                regions_scanned,
+                regions_total,
+                bytes_scanned,
+                bytes_total: total_bytes,
+                results_found,
+                elapsed_ms,
+                complete: true,
+                cancelled: self.is_cancelled(session_id),
+            },
+        );
 
         let scan_rate = if elapsed_ms > 0 {
             (addresses_checked * 1000) / elapsed_ms
@@ -530,21 +602,35 @@ impl Scanner {
         let mut filtered_results: Vec<ScanResultEx> = Vec::new();
         let mut addresses_checked: u64 = 0;
 
-        self.update_progress(session_id, ScanProgress {
-            scan_id: session_id,
-            phase: "Filtering results".into(),
-            regions_scanned: 0,
-            regions_total: total_results,
-            bytes_scanned: 0,
-            bytes_total: (total_results as u64) * (value_size as u64),
-            results_found: 0,
-            elapsed_ms: 0,
-            complete: false,
-            cancelled: false,
-        });
+        // Optimize cancellation check
+        let cancel_flag = self.cancel_flag(session_id);
+        let check_cancelled = || {
+            if let Some(flag) = &cancel_flag {
+                flag.load(Ordering::Relaxed)
+            } else {
+                false
+            }
+        };
+
+        self.update_progress(
+            session_id,
+            ScanProgress {
+                scan_id: session_id,
+                phase: "Filtering results".into(),
+                regions_scanned: 0,
+                regions_total: total_results,
+                bytes_scanned: 0,
+                bytes_total: (total_results as u64) * (value_size as u64),
+                results_found: 0,
+                elapsed_ms: 0,
+                complete: false,
+                cancelled: false,
+            },
+        );
 
         for (idx, result) in results.iter_mut().enumerate() {
-            if self.is_cancelled(session_id) {
+            // Check cancellation every 1000 items to reduce overhead
+            if idx % 1000 == 0 && check_cancelled() {
                 break;
             }
 
@@ -606,18 +692,21 @@ impl Scanner {
 
             // Update progress periodically
             if idx % 1000 == 0 {
-                self.update_progress(session_id, ScanProgress {
-                    scan_id: session_id,
-                    phase: "Filtering results".into(),
-                    regions_scanned: idx as u32,
-                    regions_total: total_results,
-                    bytes_scanned: (idx as u64) * (value_size as u64),
-                    bytes_total: (total_results as u64) * (value_size as u64),
-                    results_found: filtered_results.len() as u32,
-                    elapsed_ms: start_time.elapsed().as_millis() as u64,
-                    complete: false,
-                    cancelled: false,
-                });
+                self.update_progress(
+                    session_id,
+                    ScanProgress {
+                        scan_id: session_id,
+                        phase: "Filtering results".into(),
+                        regions_scanned: idx as u32,
+                        regions_total: total_results,
+                        bytes_scanned: (idx as u64) * (value_size as u64),
+                        bytes_total: (total_results as u64) * (value_size as u64),
+                        results_found: filtered_results.len() as u32,
+                        elapsed_ms: start_time.elapsed().as_millis() as u64,
+                        complete: false,
+                        cancelled: false,
+                    },
+                );
             }
         }
 
@@ -647,18 +736,21 @@ impl Scanner {
             }
         }
 
-        self.update_progress(session_id, ScanProgress {
-            scan_id: session_id,
-            phase: "Complete".into(),
-            regions_scanned: total_results,
-            regions_total: total_results,
-            bytes_scanned: (total_results as u64) * (value_size as u64),
-            bytes_total: (total_results as u64) * (value_size as u64),
-            results_found,
-            elapsed_ms,
-            complete: true,
-            cancelled: self.is_cancelled(session_id),
-        });
+        self.update_progress(
+            session_id,
+            ScanProgress {
+                scan_id: session_id,
+                phase: "Complete".into(),
+                regions_scanned: total_results,
+                regions_total: total_results,
+                bytes_scanned: (total_results as u64) * (value_size as u64),
+                bytes_total: (total_results as u64) * (value_size as u64),
+                results_found,
+                elapsed_ms,
+                complete: true,
+                cancelled: self.is_cancelled(session_id),
+            },
+        );
 
         let scan_rate = if elapsed_ms > 0 {
             (addresses_checked * 1000) / elapsed_ms
@@ -1081,16 +1173,16 @@ mod tests {
     fn test_scanner_cancel_flag() {
         let scanner = Scanner::new();
         let session_id = scanner.create_session(ScanOptions::default());
-        
+
         // Per-session cancellation
         assert!(!scanner.is_cancelled(session_id));
-        
+
         scanner.cancel_session(session_id);
         assert!(scanner.is_cancelled(session_id));
-        
+
         scanner.reset_cancel(session_id);
         assert!(!scanner.is_cancelled(session_id));
-        
+
         // Global cancellation (backwards compatibility)
         assert!(!scanner.is_any_cancelled());
         scanner.cancel();
@@ -1615,5 +1707,383 @@ mod tests {
         assert!(ScanCompareType::Fuzzy.is_initial());
         assert!(!ScanCompareType::Changed.is_initial());
         assert!(!ScanCompareType::Increased.is_initial());
+    }
+
+    // ========================================================================
+    // Deep Scanner Integration Tests
+    // ========================================================================
+
+    #[test]
+    fn test_scanner_initial_scan_exact_match_deep() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            max_results: 100,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Create test memory with known values
+        let test_data: Vec<u8> = vec![
+            100, 0, 0, 0, // i32 = 100 at offset 0
+            200, 0, 0, 0, // i32 = 200 at offset 4
+            100, 0, 0, 0, // i32 = 100 at offset 8
+            50, 0, 0, 0, // i32 = 50 at offset 12
+        ];
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: test_data.len(),
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let read_memory = |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= test_data.len() {
+                Ok(test_data[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        let stats = scanner
+            .initial_scan(id, "100", &regions, read_memory)
+            .unwrap();
+
+        assert_eq!(stats.results_found, 2); // Two 100s found
+        assert!(stats.elapsed_ms < 1000);
+
+        let results = scanner.get_results(id, 0, 10);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].address, 0x1000);
+        assert_eq!(results[1].address, 0x1008);
+    }
+
+    #[test]
+    fn test_scanner_initial_scan_no_matches() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        let test_data: Vec<u8> = vec![1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0];
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: test_data.len(),
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let read_memory = |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= test_data.len() {
+                Ok(test_data[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        let stats = scanner
+            .initial_scan(id, "999", &regions, read_memory)
+            .unwrap();
+        assert_eq!(stats.results_found, 0);
+    }
+
+    #[test]
+    fn test_scanner_initial_scan_empty_regions() {
+        let scanner = Scanner::new();
+        let options = ScanOptions::default();
+        let id = scanner.create_session(options);
+
+        let regions: Vec<MemoryRegion> = vec![];
+        let read_memory = |_addr: usize, _size: usize| -> Result<Vec<u8>> { Ok(vec![]) };
+
+        let stats = scanner
+            .initial_scan(id, "100", &regions, read_memory)
+            .unwrap();
+        assert_eq!(stats.results_found, 0);
+        assert_eq!(stats.regions_scanned, 0);
+    }
+
+    #[test]
+    fn test_scanner_next_scan_changed() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Initial scan data
+        let initial_data: Vec<u8> = vec![
+            100, 0, 0, 0, // i32 = 100
+            100, 0, 0, 0, // i32 = 100
+        ];
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: initial_data.len(),
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        // First scan
+        let initial_data_clone = initial_data.clone();
+        let read_initial = move |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= initial_data_clone.len() {
+                Ok(initial_data_clone[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        let stats = scanner
+            .initial_scan(id, "100", &regions, read_initial)
+            .unwrap();
+        assert_eq!(stats.results_found, 2);
+
+        // Simulate value change - first stays 100, second changes to 150
+        let changed_data: Vec<u8> = vec![
+            100, 0, 0, 0, // Still 100
+            150, 0, 0, 0, // Changed to 150
+        ];
+
+        let read_changed = move |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= changed_data.len() {
+                Ok(changed_data[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        // Next scan for changed values
+        let stats = scanner
+            .next_scan(id, ScanCompareType::Changed, None, read_changed)
+            .unwrap();
+        assert_eq!(stats.results_found, 1); // Only one value changed
+
+        let results = scanner.get_results(id, 0, 10);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].address, 0x1004);
+    }
+
+    #[test]
+    fn test_scanner_cancel() {
+        let scanner = Scanner::new();
+        let id = scanner.create_session(ScanOptions::default());
+
+        assert!(!scanner.is_cancelled(id));
+        scanner.cancel_session(id);
+        assert!(scanner.is_cancelled(id));
+    }
+
+    #[test]
+    fn test_scanner_progress_deep() {
+        let scanner = Scanner::new();
+        let id = scanner.create_session(ScanOptions::default());
+
+        // get_progress returns Option<ScanProgress>
+        if let Some(progress) = scanner.get_progress(id) {
+            assert_eq!(progress.scan_id, id);
+            assert!(!progress.complete);
+        }
+        // Progress may not exist until scan starts, which is fine
+    }
+
+    #[test]
+    fn test_bytes_conversion_all_types() {
+        // Test i32
+        let bytes = 100i32.to_le_bytes();
+        assert_eq!(bytes_to_i32(&bytes), 100);
+
+        // Test u32
+        let bytes = 0xDEADBEEFu32.to_le_bytes();
+        assert_eq!(bytes_to_u32(&bytes), 0xDEADBEEF);
+
+        // Test f32
+        let bytes = 2.5f32.to_le_bytes();
+        let result = bytes_to_f32(&bytes);
+        assert!((result - 2.5).abs() < 0.001);
+
+        // Test with short slice (should return 0)
+        assert_eq!(bytes_to_i32(&[1, 2]), 0);
+        assert_eq!(bytes_to_u32(&[]), 0);
+    }
+
+    #[test]
+    fn test_compare_functions() {
+        let a = 100i32.to_le_bytes();
+        let b = 50i32.to_le_bytes();
+
+        assert!(compare_gt(&a, &b, ValueType::I32));
+        assert!(!compare_gt(&b, &a, ValueType::I32));
+        assert!(compare_lt(&b, &a, ValueType::I32));
+        assert!(!compare_lt(&a, &b, ValueType::I32));
+
+        // Test fuzzy
+        let val1 = 100.0f32.to_le_bytes();
+        let val2 = 101.0f32.to_le_bytes();
+        assert!(compare_fuzzy(&val1, &val2, ValueType::F32, 0.02)); // 2% tolerance
+        assert!(!compare_fuzzy(&val1, &val2, ValueType::F32, 0.005)); // 0.5% tolerance too tight
+    }
+
+    #[test]
+    fn test_scanner_max_results_limit_deep() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::U8,
+            compare_type: ScanCompareType::Exact,
+            max_results: 5,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Create data with many matches (all bytes are 0x42)
+        let test_data: Vec<u8> = vec![0x42; 100];
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: test_data.len(),
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let read_memory = move |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= test_data.len() {
+                Ok(test_data[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        let stats = scanner
+            .initial_scan(id, "66", &regions, read_memory)
+            .unwrap(); // 0x42 = 66
+        assert_eq!(stats.results_found, 5); // Limited to 5
+    }
+
+    #[test]
+    fn test_scanner_unreadable_region() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: 0x1000,
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        // Simulate unreadable memory
+        let read_memory = |_addr: usize, _size: usize| -> Result<Vec<u8>> {
+            Err(Error::MemoryAccess {
+                address: 0x1000,
+                message: "Access denied".into(),
+            })
+        };
+
+        // Should complete without panic, just with 0 results
+        let stats = scanner
+            .initial_scan(id, "100", &regions, read_memory)
+            .unwrap();
+        assert_eq!(stats.results_found, 0);
+    }
+
+    #[test]
+    fn test_scanner_session_not_found() {
+        let scanner = Scanner::new();
+        let fake_id = ScanId(999);
+
+        assert!(scanner.get_session(fake_id).is_none());
+
+        // initial_scan should fail with session not found
+        let result = scanner.initial_scan(fake_id, "100", &[], |_, _| Ok(vec![]));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scanner_update_compare_type() {
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        // Update compare type
+        scanner
+            .update_session_compare(id, ScanCompareType::GreaterThan)
+            .unwrap();
+
+        let session = scanner.get_session(id).unwrap();
+        assert_eq!(session.options.compare_type, ScanCompareType::GreaterThan);
+    }
+
+    #[test]
+    fn test_scanner_result_count() {
+        use ghost_common::{MemoryType, Protection};
+
+        let scanner = Scanner::new();
+        let options = ScanOptions {
+            value_type: ValueType::I32,
+            compare_type: ScanCompareType::Exact,
+            ..Default::default()
+        };
+        let id = scanner.create_session(options);
+
+        let test_data: Vec<u8> = vec![42, 0, 0, 0, 42, 0, 0, 0, 42, 0, 0, 0];
+
+        let regions = vec![MemoryRegion {
+            base: 0x1000,
+            size: test_data.len(),
+            protection: Protection::new(true, true, false),
+            state: MemoryState::Commit,
+            region_type: MemoryType::Private,
+        }];
+
+        let read_memory = move |addr: usize, size: usize| -> Result<Vec<u8>> {
+            let offset = addr - 0x1000;
+            if offset + size <= test_data.len() {
+                Ok(test_data[offset..offset + size].to_vec())
+            } else {
+                Err(Error::Internal("Out of bounds".into()))
+            }
+        };
+
+        scanner
+            .initial_scan(id, "42", &regions, read_memory)
+            .unwrap();
+
+        assert_eq!(scanner.get_result_count(id), 3);
     }
 }

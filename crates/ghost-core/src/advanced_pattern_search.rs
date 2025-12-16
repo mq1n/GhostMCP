@@ -491,7 +491,7 @@ impl AdvancedPatternSearch {
             ImmediatePattern::Any => true,
             ImmediatePattern::HasBits(bits) => (value as u64 & bits) == *bits,
             ImmediatePattern::ClearBits(bits) => (value as u64 & bits) == 0,
-            ImmediatePattern::Aligned(align) => *align > 0 && (value as u64) % *align == 0,
+            ImmediatePattern::Aligned(align) => *align > 0 && (value as u64).is_multiple_of(*align),
         }
     }
 

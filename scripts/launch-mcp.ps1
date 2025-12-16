@@ -21,13 +21,18 @@ param(
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 
+# Paths
+$ReleasePath = Join-Path $ProjectRoot "target\release"
+
+# Set RUST_LOG to debug for all MCP servers
+$env:RUST_LOG = "debug"
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Ghost-MCP Launch Script" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  Log Level: DEBUG" -ForegroundColor Yellow
+Write-Host "  Log Path: $ReleasePath" -ForegroundColor Yellow
 Write-Host ""
-
-# Paths
-$ReleasePath = Join-Path $ProjectRoot "target\release"
 $TestTargetExe = Join-Path $ReleasePath "ghost-test-target.exe"
 $LoaderExe = Join-Path $ReleasePath "ghost-loader.exe"
 $AgentDll = Join-Path $ReleasePath "ghost_agent.dll"
@@ -223,7 +228,7 @@ foreach ($server in $servers) {
     } else {
         Write-Host "  Launching $($server.Name) on stdio (target $($server.ToolTarget) tools)..." -ForegroundColor Cyan
     }
-    $proc = Start-Process -FilePath $server.Exe -ArgumentList $args -PassThru -WindowStyle Hidden
+    $proc = Start-Process -FilePath $server.Exe -ArgumentList $args -PassThru -WindowStyle Hidden -WorkingDirectory $ReleasePath
     if ($proc) {
         $serverProcs += $proc
         Write-Host "    [OK] PID $($proc.Id)" -ForegroundColor Green
