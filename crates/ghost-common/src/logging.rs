@@ -235,7 +235,20 @@ pub fn init_logging(config: &LogConfig) {
 
 /// Initialize logging for the agent (DLL context)
 pub fn init_agent_logging() {
-    init_logging(&LogConfig::minimal());
+    let mut config = LogConfig::minimal();
+
+    // Enable file logging in temp directory with PID to avoid conflicts
+    let mut path = std::env::temp_dir();
+    path.push(format!("ghost-agent-{}.log", std::process::id()));
+
+    config.file_enabled = true;
+    config.file_path = path.to_string_lossy().to_string();
+
+    // Enable useful metadata for file logs
+    config.timestamps = true;
+    config.show_target = true;
+
+    init_logging(&config);
 }
 
 /// Initialize logging for the host with default settings
