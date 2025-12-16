@@ -2681,6 +2681,12 @@ impl InProcessBackend {
             Ok(result.is_ok())
         }
     }
+
+    /// Get full path to the process executable
+    fn get_process_path(&self) -> Option<String> {
+        let modules = self.modules.read().ok()?;
+        modules.first().map(|m| m.path.clone())
+    }
 }
 
 impl ProcessControl for InProcessBackend {
@@ -3095,6 +3101,7 @@ impl GhostBackend for InProcessBackend {
             version: env!("CARGO_PKG_VERSION").to_string(),
             pid: self.get_pid(),
             process_name: self.get_process_name().unwrap_or_default(),
+            process_path: self.get_process_path(),
             arch: if cfg!(target_arch = "x86_64") {
                 "x64".to_string()
             } else {
@@ -3403,6 +3410,7 @@ impl MultiClientBackend {
             version: env!("CARGO_PKG_VERSION").to_string(),
             pid: 0,
             process_name: "unknown".to_string(),
+            process_path: None,
             arch: "unknown".to_string(),
             connected: true,
             client_count: 0,

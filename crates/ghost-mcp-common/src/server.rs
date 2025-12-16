@@ -17,6 +17,15 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
 
+/// Truncate a path string for display, keeping the end visible
+fn truncate_path(path: &str, max_len: usize) -> String {
+    if path.len() <= max_len {
+        path.to_string()
+    } else {
+        format!("...{}", &path[path.len() - (max_len - 3)..])
+    }
+}
+
 /// Transport mode for the server
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
@@ -253,12 +262,34 @@ impl McpServer {
 
     /// Try to connect to agent
     pub async fn try_connect_agent(&self) -> bool {
-        self.agent.try_connect().await
+        let connected = self.agent.try_connect().await;
+        if connected {
+            self.display_target_process_info().await;
+        }
+        connected
     }
 
     /// Connect to agent with retry
     pub async fn connect_agent(&self) -> Result<()> {
-        self.agent.connect().await
+        self.agent.connect().await?;
+        self.display_target_process_info().await;
+        Ok(())
+    }
+
+    /// Display target process information prominently
+    async fn display_target_process_info(&self) {
+        if let Some(status) = self.agent.status().await {
+            info!("╔══════════════════════════════════════════════════════════════╗");
+            info!("║                    TARGET PROCESS INFO                       ║");
+            info!("╠══════════════════════════════════════════════════════════════╣");
+            info!("║  Name: {:<54} ║", status.process_name);
+            info!("║  PID:  {:<54} ║", status.pid);
+            if let Some(ref path) = status.process_path {
+                info!("║  Path: {:<54} ║", truncate_path(path, 54));
+            }
+            info!("║  Arch: {:<54} ║", status.arch);
+            info!("╚══════════════════════════════════════════════════════════════╝");
+        }
     }
 
     /// Run server in stdio mode

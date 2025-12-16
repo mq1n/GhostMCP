@@ -130,6 +130,9 @@ pub struct AgentStatus {
     pub version: String,
     pub pid: u32,
     pub process_name: String,
+    /// Full path to the process executable
+    #[serde(default)]
+    pub process_path: Option<String>,
     pub arch: String,
     pub connected: bool,
     /// Number of connected clients (multi-client support)
@@ -1091,6 +1094,7 @@ mod tests {
                 version: "0.1.0".to_string(),
                 pid: 1234,
                 process_name: "test.exe".to_string(),
+                process_path: Some("C:\\test\\test.exe".to_string()),
                 arch: "x64".to_string(),
                 connected: true,
                 client_count: 1,

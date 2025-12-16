@@ -719,15 +719,18 @@ async fn receive_handshake(stream: &mut TcpStream) -> ghost_common::Result<Reque
 /// Get agent status
 fn get_agent_status(state: &SharedState) -> ghost_common::ipc::AgentStatus {
     let pid = std::process::id();
-    let process_name = std::env::current_exe()
-        .ok()
+    let exe_path = std::env::current_exe().ok();
+    let process_name = exe_path
+        .as_ref()
         .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
         .unwrap_or_else(|| "unknown".to_string());
+    let process_path = exe_path.map(|p| p.to_string_lossy().to_string());
 
     ghost_common::ipc::AgentStatus {
         version: env!("CARGO_PKG_VERSION").to_string(),
         pid,
         process_name,
+        process_path,
         arch: if cfg!(target_arch = "x86_64") {
             "x64"
         } else {

@@ -150,14 +150,27 @@ if ($Target -eq "ghost-test-target.exe") {
     Write-Host "  Started with PID: $targetPid" -ForegroundColor Green
     Start-Sleep -Milliseconds 500  # Give it time to initialize
 } else {
-    # Find existing process
-    $proc = Get-Process -Name ($Target -replace '\.exe$','') -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($proc) {
-        $targetPid = $proc.Id
-        Write-Host "  Found existing process: $Target (PID: $targetPid)" -ForegroundColor Green
+    # Check if Target is a PID (numeric) or process name
+    if ($Target -match '^\d+$') {
+        # Target is a PID
+        $proc = Get-Process -Id ([int]$Target) -ErrorAction SilentlyContinue
+        if ($proc) {
+            $targetPid = $proc.Id
+            Write-Host "  Found process by PID: $($proc.ProcessName) (PID: $targetPid)" -ForegroundColor Green
+        } else {
+            Write-Host "  Process with PID '$Target' not found. Please check the PID." -ForegroundColor Red
+            exit 1
+        }
     } else {
-        Write-Host "  Process '$Target' not found. Please start it first." -ForegroundColor Red
-        exit 1
+        # Find existing process by name
+        $proc = Get-Process -Name ($Target -replace '\.exe$','') -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($proc) {
+            $targetPid = $proc.Id
+            Write-Host "  Found existing process: $Target (PID: $targetPid)" -ForegroundColor Green
+        } else {
+            Write-Host "  Process '$Target' not found. Please start it first." -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
