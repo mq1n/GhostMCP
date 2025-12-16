@@ -1491,7 +1491,7 @@ impl InProcessBackend {
             }
             "r2_status" | "ida_status" | "ghidra_status" => {
                 let backend = method.split('_').next().unwrap_or("unknown");
-                 Ok(serde_json::json!({
+                Ok(serde_json::json!({
                     "backend": backend,
                     "connected": false,
                     "available": false,
@@ -1499,15 +1499,9 @@ impl InProcessBackend {
                     "info": null
                 }))
             }
-            "yara_list_rules" => {
-                Ok(serde_json::json!({ "rules": [] }))
-            }
-            "signature_db_list" => {
-                 Ok(serde_json::json!({ "databases": [] }))
-            }
-            "debug_session_list" => {
-                 Ok(serde_json::json!({ "sessions": [] }))
-            }
+            "yara_list_rules" => Ok(serde_json::json!({ "rules": [] })),
+            "signature_db_list" => Ok(serde_json::json!({ "databases": [] })),
+            "debug_session_list" => Ok(serde_json::json!({ "sessions": [] })),
 
             _ => {
                 tracing::warn!(target: "ghost_agent::backend", method = %method, "Unknown method");
