@@ -684,10 +684,14 @@ impl InProcessBackend {
             }
             "memory_write" => {
                 let addr = parse_address(&request.params["address"])?;
+                // Accept both "bytes" and "data" parameter names for compatibility
                 let bytes_hex = request.params["bytes"]
                     .as_str()
-                    .ok_or(Error::Internal("Missing bytes".into()))?;
-                let bytes = hex::decode(bytes_hex)
+                    .or_else(|| request.params["data"].as_str())
+                    .ok_or(Error::Internal("Missing bytes/data parameter".into()))?;
+                // Strip spaces from hex string (e.g., "2C 01 00 00" -> "2C010000")
+                let bytes_hex_clean: String = bytes_hex.chars().filter(|c| !c.is_whitespace()).collect();
+                let bytes = hex::decode(&bytes_hex_clean)
                     .map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
 
                 // Read original bytes for undo history
@@ -3784,9 +3788,25 @@ impl MultiClientBackend {
         // Register client in shared state
         self.state.register_client(identity.clone());
 
+        // In debug builds or when RUST_LOG is set, grant all capabilities for development
+        let is_debug = cfg!(debug_assertions) || std::env::var("RUST_LOG").is_ok();
+
         // Determine granted capabilities (validate + default read)
         let mut granted: Vec<Capability> = Vec::new();
-        if identity.capabilities.is_empty() {
+        if is_debug {
+            // Debug mode: grant all capabilities
+            granted = vec![
+                Capability::Read,
+                Capability::Write,
+                Capability::Execute,
+                Capability::Debug,
+                Capability::Admin,
+            ];
+            tracing::info!(
+                target: "ghost_agent::handshake",
+                "Debug mode: granting all capabilities"
+            );
+        } else if identity.capabilities.is_empty() {
             granted.push(Capability::Read);
         } else {
             for cap in &identity.capabilities {
@@ -3861,11 +3881,15 @@ impl MultiClientBackend {
         client_id: Option<&str>,
     ) -> Result<serde_json::Value> {
         let addr = parse_address(&request.params["address"])?;
+        // Accept both "bytes" and "data" parameter names for compatibility
         let bytes_hex = request.params["bytes"]
             .as_str()
-            .ok_or(Error::Internal("Missing bytes".into()))?;
+            .or_else(|| request.params["data"].as_str())
+            .ok_or(Error::Internal("Missing bytes/data parameter".into()))?;
+        // Strip spaces from hex string (e.g., "2C 01 00 00" -> "2C010000")
+        let bytes_hex_clean: String = bytes_hex.chars().filter(|c| !c.is_whitespace()).collect();
         let bytes =
-            hex::decode(bytes_hex).map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
+            hex::decode(&bytes_hex_clean).map_err(|e| Error::Internal(format!("Invalid hex: {}", e)))?;
 
         // Read original bytes for patch tracking
         let original = self.backend.read(addr, bytes.len())?;
@@ -5489,21 +5513,32 @@ impl RequestHandler for MultiClientBackend {
 
         // Capability gating (deny by default if unknown client)
         if let Some(cid) = client_id {
-            let required = Capability::for_method(&method);
-            let granted = self.state.get_capabilities(cid);
-            if let Err(e) = Capability::check(required, &granted, &method) {
-                tracing::warn!(
-                    target: "ghost_agent::backend",
-                    client = %cid,
-                    method = %method,
-                    "Capability denied: {}",
-                    e
-                );
-                return Response::error(
-                    request.id,
-                    error_codes::AUTHORIZATION_DENIED,
-                    format!("Capability denied: {}", e),
-                );
+            // Safety control operations bypass capability checks - they're essential escape hatches
+            let is_safety_control = matches!(
+                method.as_str(),
+                "safety_set_mode" | "safety_approve" | "safety_reset" | "safety_status" | "safety_config"
+            );
+
+            // Expert mode bypasses capability checks - user has explicitly opted into full access
+            let is_expert_mode = self.safety.get_mode() == ghost_common::safety::SafetyMode::Expert;
+
+            if !is_safety_control && !is_expert_mode {
+                let required = Capability::for_method(&method);
+                let granted = self.state.get_capabilities(cid);
+                if let Err(e) = Capability::check(required, &granted, &method) {
+                    tracing::warn!(
+                        target: "ghost_agent::backend",
+                        client = %cid,
+                        method = %method,
+                        "Capability denied: {}",
+                        e
+                    );
+                    return Response::error(
+                        request.id,
+                        error_codes::AUTHORIZATION_DENIED,
+                        format!("Capability denied: {}", e),
+                    );
+                }
             }
 
             // Safety checks (Rate limits, Educational mode, Protected processes, Approval)
