@@ -940,6 +940,7 @@ mod live_tests {
             if let Ok(resp_text) = serde_json::to_string(&response) {
                 let _ = writer.write_all(resp_text.as_bytes()).await;
                 let _ = writer.write_all(b"\n").await;
+                let _ = writer.flush().await;
             }
         }
     }
@@ -1018,7 +1019,7 @@ mod live_tests {
     }
 
     /// Test concurrent connections to all servers
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_concurrent_agent_access() {
         println!("\n=== Concurrent Agent Access ===\n");
 
@@ -1072,7 +1073,7 @@ mod live_tests {
     }
 
     /// Test meta tools respond on all servers
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_meta_tools_all_servers() {
         println!("\n=== Meta Tools on All Servers ===\n");
 
@@ -1138,7 +1139,7 @@ mod live_tests {
     }
 
     /// Test mcp_capabilities reports <= 90 tools
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_capabilities_tool_count() {
         println!("\n=== Capabilities Tool Count ===\n");
 
@@ -1194,7 +1195,7 @@ mod live_tests {
     }
 
     /// Test patch history is accessible across servers
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_patch_history_accessible() {
         println!("\n=== Patch History Accessibility ===\n");
 
