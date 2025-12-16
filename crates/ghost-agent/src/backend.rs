@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast::error::TryRecvError;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::HMODULE;
+use windows::Win32::Foundation::{CloseHandle, HANDLE, HMODULE};
 use windows::Win32::System::Diagnostics::Debug::{IsDebuggerPresent, ReadProcessMemory};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
@@ -41,7 +41,10 @@ use windows::Win32::System::Memory::{
 use windows::Win32::System::ProcessStatus::{
     EnumProcessModules, GetModuleBaseNameW, GetModuleFileNameExW, GetModuleInformation, MODULEINFO,
 };
-use windows::Win32::System::Threading::{CreateThread, GetCurrentProcess};
+use windows::Win32::System::Threading::{
+    CreateThread, GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_QUERY_INFORMATION,
+    PROCESS_VM_READ,
+};
 
 /// Parameters for creating an extended hook
 #[derive(Debug, Clone, Default)]
@@ -209,6 +212,7 @@ fn read_signed_from_bytes(data: &[u8], offset: usize, size: usize) -> Option<isi
 
 /// In-process backend that directly accesses memory
 pub struct InProcessBackend {
+    process_handle: Option<HANDLE>,
     /// Cached modules
     modules: RwLock<Vec<Module>>,
     /// Active breakpoints (legacy - now using ghost_core::debug)
@@ -337,7 +341,13 @@ pub struct AddressListEntry {
 
 impl InProcessBackend {
     pub fn new() -> Result<Self> {
+        let process_handle = unsafe {
+            let pid = GetCurrentProcessId();
+            OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid).ok()
+        };
+
         let backend = Self {
+            process_handle,
             modules: RwLock::new(Vec::new()),
             breakpoints: Mutex::new(HashMap::new()),
             hooks: Mutex::new(HashMap::new()),
@@ -1056,13 +1066,18 @@ impl InProcessBackend {
             }
             "memory_search" => {
                 let value_str = Self::safe_get_str(&request.params, "value")?;
-                let type_str = Self::safe_get_str_opt(&request.params, "value_type").unwrap_or("i32");
+                let type_str =
+                    Self::safe_get_str_opt(&request.params, "value_type").unwrap_or("i32");
                 let value_type = parse_value_type(type_str)?;
                 tracing::debug!(target: "ghost_agent::backend", value = value_str, value_type = type_str, "Searching memory");
                 let value_bytes = ghost_core::memory::value_to_bytes(value_str, value_type)?;
-                let start = request.params.get("start_address")
+                let start = request
+                    .params
+                    .get("start_address")
                     .and_then(|v| Self::safe_parse_hex_address(v));
-                let end = request.params.get("end_address")
+                let end = request
+                    .params
+                    .get("end_address")
                     .and_then(|v| Self::safe_parse_hex_address(v));
                 let results = self.search_value(&value_bytes, value_type, start, end)?;
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "Memory search complete");
@@ -1071,43 +1086,47 @@ impl InProcessBackend {
             "memory_search_pattern" => {
                 let pattern = Self::safe_get_str(&request.params, "pattern")?;
                 let module_name = Self::safe_get_str_opt(&request.params, "module");
-                
+
                 // Validate pattern before processing
                 let (pattern_bytes, mask) = ghost_core::PatternScanner::parse_aob_pattern(pattern)?;
                 if pattern_bytes.is_empty() {
                     return Err(Error::Internal("Empty or invalid pattern".into()));
                 }
                 if pattern_bytes.len() < 2 {
-                    return Err(Error::Internal("Pattern too short (minimum 2 bytes)".into()));
+                    return Err(Error::Internal(
+                        "Pattern too short (minimum 2 bytes)".into(),
+                    ));
                 }
-                
+
                 // If module is specified, search only within that module
                 let results = if let Some(mod_name) = module_name {
                     let modules = self.get_modules()?;
                     let module = modules
                         .iter()
                         .find(|m| m.name.eq_ignore_ascii_case(mod_name))
-                        .ok_or_else(|| Error::Internal(format!("Module '{}' not found", mod_name)))?;
-                    
+                        .ok_or_else(|| {
+                            Error::Internal(format!("Module '{}' not found", mod_name))
+                        })?;
+
                     // Validate module size before scanning
                     Self::validate_scan_size(module.size)?;
-                    
-                    tracing::debug!(target: "ghost_agent::backend", 
-                        pattern = pattern, 
+
+                    tracing::debug!(target: "ghost_agent::backend",
+                        pattern = pattern,
                         module = mod_name,
                         base = format!("0x{:x}", module.base),
                         size = module.size,
                         "Searching AOB pattern in module");
-                    
+
                     let mut results = Vec::new();
                     let max_results = 1000;
                     const MAX_CHUNK_SIZE: usize = 4 * 1024 * 1024;
                     let mut offset = 0;
-                    
+
                     while offset < module.size && results.len() < max_results {
                         let chunk_size = (module.size - offset).min(MAX_CHUNK_SIZE);
                         let chunk_base = module.base + offset;
-                        
+
                         if let Ok(data) = self.read(chunk_base, chunk_size) {
                             let offsets = ghost_core::PatternScanner::find_aob_in_buffer(
                                 &data,
@@ -1118,21 +1137,28 @@ impl InProcessBackend {
                             for &off in &offsets {
                                 results.push(ScanResult {
                                     address: chunk_base + off,
-                                    value: data.get(off..off + pattern_bytes.len())
-                                        .unwrap_or(&[]).to_vec(),
+                                    value: data
+                                        .get(off..off + pattern_bytes.len())
+                                        .unwrap_or(&[])
+                                        .to_vec(),
                                 });
                             }
                         }
-                        
-                        let advance = chunk_size.saturating_sub(pattern_bytes.len().saturating_sub(1));
-                        offset += if advance == 0 { chunk_size.max(1) } else { advance };
+
+                        let advance =
+                            chunk_size.saturating_sub(pattern_bytes.len().saturating_sub(1));
+                        offset += if advance == 0 {
+                            chunk_size.max(1)
+                        } else {
+                            advance
+                        };
                     }
                     results
                 } else {
                     tracing::debug!(target: "ghost_agent::backend", pattern = pattern, "Searching AOB pattern in all memory");
                     self.search_pattern(pattern)?
                 };
-                
+
                 tracing::info!(target: "ghost_agent::backend", results = results.len(), "AOB search complete");
                 Ok(serde_json::to_value(results)?)
             }
@@ -2003,6 +2029,16 @@ impl InProcessBackend {
     }
 }
 
+impl Drop for InProcessBackend {
+    fn drop(&mut self) {
+        if let Some(handle) = self.process_handle.take() {
+            unsafe {
+                let _ = CloseHandle(handle);
+            }
+        }
+    }
+}
+
 impl MemoryAccess for InProcessBackend {
     fn read(&self, addr: usize, size: usize) -> Result<Vec<u8>> {
         // Use ReadProcessMemory instead of direct pointer access to avoid
@@ -2034,8 +2070,8 @@ impl MemoryAccess for InProcessBackend {
 
             // Calculate how much of the requested size is within this region
             let region_base = mbi.BaseAddress as usize;
-            let region_end = region_base + mbi.RegionSize;
-            let read_end = addr + size;
+            let region_end = region_base.saturating_add(mbi.RegionSize);
+            let read_end = addr.saturating_add(size);
 
             // Only read up to the end of this committed region
             let safe_size = if read_end > region_end {
@@ -2052,7 +2088,7 @@ impl MemoryAccess for InProcessBackend {
             }
 
             // Use ReadProcessMemory to avoid triggering ASan instrumentation
-            let process = GetCurrentProcess();
+            let process = self.process_handle.unwrap_or_else(GetCurrentProcess);
             let mut buffer = vec![0u8; safe_size];
             let mut bytes_read: usize = 0;
 
@@ -2809,6 +2845,40 @@ impl InProcessBackend {
         let modules = self.modules.read().ok()?;
         modules.first().map(|m| m.path.clone())
     }
+
+    /// Get PE section ranges: (name, start_address, size, characteristics)
+    fn get_pe_section_ranges(&self, base: usize) -> Result<Vec<(String, usize, usize, u32)>> {
+        let mut sections = Vec::new();
+        unsafe {
+            let dos_header = base as *const u8;
+            if *(dos_header as *const u16) != 0x5A4D {
+                return Err(Error::Internal("Invalid DOS header".into()));
+            }
+            let e_lfanew = *((base + 0x3C) as *const i32);
+            let nt_headers = base + e_lfanew as usize;
+            let file_header = nt_headers + 4;
+            let num_sections = *((file_header + 2) as *const u16) as usize;
+            let optional_header_size = *((file_header + 16) as *const u16) as usize;
+            let section_headers = file_header + 20 + optional_header_size;
+
+            for i in 0..num_sections.min(64) {
+                let section = section_headers + (i * 40);
+                let name_bytes = std::slice::from_raw_parts(section as *const u8, 8);
+                let name = String::from_utf8_lossy(name_bytes)
+                    .trim_end_matches('\0')
+                    .to_string();
+                let virtual_size = *((section + 8) as *const u32) as usize;
+                let virtual_address = *((section + 12) as *const u32) as usize;
+                let characteristics = *((section + 36) as *const u32);
+
+                // Calculate actual section address in memory
+                let section_start = base + virtual_address;
+
+                sections.push((name, section_start, virtual_size, characteristics));
+            }
+        }
+        Ok(sections)
+    }
 }
 
 impl ProcessControl for InProcessBackend {
@@ -3120,28 +3190,132 @@ impl StaticAnalysis for InProcessBackend {
         let max_strings = 10000;
         let min_len = if min_length == 0 { 4 } else { min_length };
 
-        // Read module memory
-        let data = self.read(module_info.base, module_info.size)?;
+        // Get PE sections and scan only data sections (not headers or code)
+        let sections = self.get_pe_section_ranges(module_info.base)?;
 
-        let mut i = 0;
-        while i < data.len() && strings.len() < max_strings {
-            // Try ASCII string
-            if let Some(s) = ghost_core::disasm::is_ascii_string(&data[i..], min_len) {
-                strings.push((module_info.base + i, s.clone()));
-                i += s.len() + 1; // Skip past null terminator
+        // Sections that typically contain strings: .rdata, .data, .rodata, etc.
+        // Skip .text (code) and PE headers
+        let string_sections: Vec<_> = sections
+            .iter()
+            .filter(|(name, _, _, characteristics)| {
+                // Skip executable sections (code)
+                let is_executable = (*characteristics & 0x20000000) != 0;
+                // Include readable, non-executable sections
+                let is_readable = (*characteristics & 0x40000000) != 0;
+                // Common data section names
+                let is_data_section = name == ".rdata"
+                    || name == ".data"
+                    || name == ".rodata"
+                    || name == ".idata"
+                    || name == ".rsrc"
+                    || name == ".bss"
+                    || name.starts_with(".?")  // MSVC sections
+                    || (!is_executable && is_readable);
+                is_data_section && !is_executable
+            })
+            .collect();
+
+        tracing::debug!(
+            target: "ghost_agent::backend",
+            section_count = string_sections.len(),
+            "Scanning data sections for strings"
+        );
+
+        for (name, start, size, _) in string_sections {
+            if strings.len() >= max_strings {
+                break;
+            }
+
+            // Skip invalid or too large sections
+            if *size == 0 || *size > 100 * 1024 * 1024 {
                 continue;
             }
 
-            // Try UTF-16 string (check alignment)
-            if i % 2 == 0 {
-                if let Some(s) = ghost_core::disasm::is_utf16_string(&data[i..], min_len) {
-                    strings.push((module_info.base + i, s.clone()));
-                    i += (s.len() + 1) * 2; // Skip past null terminator
-                    continue;
+            tracing::trace!(
+                target: "ghost_agent::backend",
+                section = %name,
+                start = format!("0x{:x}", start),
+                size = size,
+                "Scanning section"
+            );
+
+            // Read section data
+            let data = match self.read(*start, *size) {
+                Ok(d) => d,
+                Err(_) => continue, // Skip unreadable sections
+            };
+
+            // Extract ASCII strings (similar to CE/x64dbg approach)
+            // Scan for sequences of printable ASCII chars (0x20-0x7E)
+            let mut string_start = 0usize;
+            for idx in 0..data.len() {
+                let byte = data[idx];
+                // Check if printable ASCII (space to ~)
+                if !(byte >= 0x20 && byte <= 0x7E) {
+                    let string_length = idx - string_start;
+                    if string_length >= min_len && strings.len() < max_strings {
+                        if let Ok(s) = std::str::from_utf8(&data[string_start..idx]) {
+                            strings.push((*start + string_start, s.to_string()));
+                        }
+                    }
+                    string_start = idx + 1;
+                }
+            }
+            // Handle string at end of buffer
+            let remaining_len = data.len() - string_start;
+            if remaining_len >= min_len && strings.len() < max_strings {
+                if let Ok(s) = std::str::from_utf8(&data[string_start..]) {
+                    strings.push((*start + string_start, s.to_string()));
                 }
             }
 
-            i += 1;
+            // Extract UTF-16 strings (wide chars 0x0020-0x007E)
+            string_start = 0;
+            for idx in 0..(data.len() / 2) {
+                if idx * 2 + 1 >= data.len() {
+                    break;
+                }
+                let wchar = u16::from_le_bytes([data[idx * 2], data[idx * 2 + 1]]);
+                // Check if printable (space to ~)
+                if !(wchar >= 0x0020 && wchar < 0x007F) {
+                    let string_length = idx - string_start;
+                    if string_length >= min_len && strings.len() < max_strings {
+                        // Convert UTF-16 to String
+                        let wide_slice: Vec<u16> = (string_start..idx)
+                            .filter_map(|i| {
+                                if i * 2 + 1 < data.len() {
+                                    Some(u16::from_le_bytes([data[i * 2], data[i * 2 + 1]]))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if let Ok(s) = String::from_utf16(&wide_slice) {
+                            strings.push((*start + string_start * 2, s));
+                        }
+                    }
+                    string_start = idx + 1;
+                }
+            }
+            // Handle wide string at end of buffer
+            let remaining_wchars = data.len() / 2 - string_start;
+            if remaining_wchars >= min_len
+                && strings.len() < max_strings
+                && data.len() / 2 > string_start
+            {
+                let wide_slice: Vec<u16> = (string_start..(data.len() / 2))
+                    .filter_map(|i| {
+                        if i * 2 + 1 < data.len() {
+                            Some(u16::from_le_bytes([data[i * 2], data[i * 2 + 1]]))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if let Ok(s) = String::from_utf16(&wide_slice) {
+                    strings.push((*start + string_start * 2, s));
+                }
+            }
         }
 
         Ok(strings)
