@@ -786,7 +786,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_try_connect_fails_without_agent() {
-        let client = AgentClient::new();
+        // Use a high port that's very unlikely to have anything listening
+        let client = AgentClient::with_port(59999);
         let result = client.try_connect().await;
         assert!(!result);
         assert!(!client.is_connected());

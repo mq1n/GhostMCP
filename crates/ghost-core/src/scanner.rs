@@ -888,8 +888,9 @@ fn filter_regions(regions: &[MemoryRegion], filter: &RegionFilter) -> Vec<Memory
                     return false;
                 }
             }
-            // Skip very large regions (>64MB)
-            if r.size > 64 * 1024 * 1024 {
+            // Skip very large regions (>512MB) - games often have large allocations
+            // The scanner handles large regions by chunking into 4MB pieces
+            if r.size > 512 * 1024 * 1024 {
                 return false;
             }
             true

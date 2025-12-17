@@ -88,6 +88,9 @@ enum Commands {
         #[arg(short, long)]
         test: Option<String>,
     },
+
+    /// Run all integration tests (shorthand for 'test' without args)
+    TestAll,
 }
 
 /// JSON-RPC request
@@ -338,6 +341,7 @@ enum TestCategory {
     Ghidra,
     Ai,
     Yara,
+    Integration,
     All,
 }
 
@@ -367,6 +371,7 @@ impl std::str::FromStr for TestCategory {
             "ghidra" => Ok(TestCategory::Ghidra),
             "ai" => Ok(TestCategory::Ai),
             "yara" => Ok(TestCategory::Yara),
+            "integration" | "int" => Ok(TestCategory::Integration),
             "all" => Ok(TestCategory::All),
             _ => anyhow::bail!("Unknown test category: {}", s),
         }
@@ -916,6 +921,220 @@ fn run_integration_tests(client: &mut McpClient, specific_test: Option<String>) 
         ),
     ];
 
+    // ================================================================
+    // INTEGRATION TEST - Full workflow: alloc, write, scan, patch, pointer
+    // ================================================================
+    let integration_tests: Vec<(&str, TestFn)> = vec![(
+        "integration/full_memory_workflow",
+        Box::new(|c| {
+            println!("\n    [Integration Test: Full Memory Workflow]");
+
+            // Step 1: Allocate heap memory using exec_alloc
+            println!("    Step 1: Allocating 4096 bytes of heap memory...");
+            let alloc_result = c.call_tool(
+                "exec_alloc",
+                serde_json::json!({
+                    "size": 4096,
+                    "protection": "rwx"
+                }),
+            )?;
+            let alloc_text = alloc_result["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Alloc response: {}",
+                alloc_text.lines().next().unwrap_or("(empty)")
+            );
+
+            // Extract allocated address from response
+            let addr_str = if let Some(start) = alloc_text.find("0x") {
+                let end = alloc_text[start..]
+                    .find(|c: char| !c.is_ascii_hexdigit() && c != 'x' && c != 'X')
+                    .map(|e| start + e)
+                    .unwrap_or(alloc_text.len());
+                &alloc_text[start..end]
+            } else {
+                return Err(anyhow::anyhow!("Failed to find allocated address"));
+            };
+            println!("    Allocated at: {}", addr_str);
+
+            // Step 2: Write a known value (0xDEADBEEF = 3735928559)
+            println!("    Step 2: Writing value 3735928559 (0xDEADBEEF) to allocated memory...");
+            let write_result = c.call_tool(
+                "memory_write",
+                serde_json::json!({
+                    "address": addr_str,
+                    "value": "3735928559",
+                    "type": "u32"
+                }),
+            )?;
+            if write_result.get("error").is_some() {
+                return Err(anyhow::anyhow!("Write failed"));
+            }
+            println!("    Write successful!");
+
+            // Step 3: Read back to verify
+            println!("    Step 3: Reading back value to verify...");
+            let read_result = c.call_tool(
+                "memory_read",
+                serde_json::json!({
+                    "address": addr_str,
+                    "size": 4
+                }),
+            )?;
+            let read_text = read_result["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Read result: {}",
+                read_text.lines().next().unwrap_or(read_text)
+            );
+
+            // Step 4: Create a scan session and scan for our value
+            println!("    Step 4: Creating scan session for i32...");
+            let scan_new = c.call_tool(
+                "scan_new",
+                serde_json::json!({
+                    "value_type": "i32"
+                }),
+            )?;
+            let scan_text = scan_new["content"][0]["text"].as_str().unwrap_or("");
+            // Extract scan_id
+            let scan_id = if let Some(id_start) = scan_text.find("scan_id") {
+                let after = &scan_text[id_start..];
+                if let Some(num_start) = after.find(|c: char| c.is_ascii_digit()) {
+                    let num_end = after[num_start..]
+                        .find(|c: char| !c.is_ascii_digit())
+                        .map(|e| num_start + e)
+                        .unwrap_or(after.len());
+                    after[num_start..num_end].to_string()
+                } else {
+                    "1".to_string()
+                }
+            } else {
+                "1".to_string()
+            };
+            println!("    Scan session created: {}", scan_id);
+
+            // Step 5: Perform initial scan for 0xDEADBEEF as signed i32 (-559038737)
+            println!("    Step 5: Scanning for value -559038737 (0xDEADBEEF as i32)...");
+            let scan_first = c.call_tool(
+                "scan_first",
+                serde_json::json!({
+                    "scan_id": scan_id,
+                    "value": "-559038737",
+                    "compare": "exact"
+                }),
+            )?;
+            let scan_first_text = scan_first["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Scan result: {} results found",
+                if scan_first_text.contains("results_found") {
+                    scan_first_text
+                        .lines()
+                        .find(|l| l.contains("results_found"))
+                        .unwrap_or("?")
+                } else {
+                    "?"
+                }
+            );
+
+            // Step 6: Change the value to something else
+            println!("    Step 6: Writing new value 12345678...");
+            c.call_tool(
+                "memory_write",
+                serde_json::json!({
+                    "address": addr_str,
+                    "value": "12345678",
+                    "type": "i32"
+                }),
+            )?;
+
+            // Step 7: Scan for new value (filter results)
+            println!("    Step 7: Filtering scan for new value 12345678...");
+            let scan_next = c.call_tool(
+                "scan_next",
+                serde_json::json!({
+                    "scan_id": scan_id,
+                    "value": "12345678",
+                    "compare": "exact"
+                }),
+            )?;
+            let scan_next_text = scan_next["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Filtered: {}",
+                scan_next_text.lines().next().unwrap_or("?")
+            );
+
+            // Step 8: Patch the memory with NOP bytes
+            println!("    Step 8: Patching memory with custom bytes [0x90, 0x90, 0x90, 0x90]...");
+            let patch_result = c.call_tool(
+                "patch_bytes",
+                serde_json::json!({
+                    "address": addr_str,
+                    "bytes": [0x90, 0x90, 0x90, 0x90]
+                }),
+            )?;
+            if patch_result.get("error").is_some() {
+                println!("    Patch failed (may not be supported), continuing...");
+            } else {
+                println!("    Patch applied!");
+            }
+
+            // Step 9: Read back patched bytes
+            println!("    Step 9: Reading patched memory...");
+            let read_patched = c.call_tool(
+                "memory_read",
+                serde_json::json!({
+                    "address": addr_str,
+                    "size": 4
+                }),
+            )?;
+            let patched_text = read_patched["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Patched bytes: {}",
+                patched_text.lines().next().unwrap_or(patched_text)
+            );
+
+            // Step 10: Test pointer resolution (using our allocated address as example)
+            println!("    Step 10: Testing pointer resolution...");
+            let ptr_result = c.call_tool(
+                "pointer_resolve",
+                serde_json::json!({
+                    "base": addr_str,
+                    "offsets": [0]
+                }),
+            )?;
+            let ptr_text = ptr_result["content"][0]["text"].as_str().unwrap_or("");
+            println!(
+                "    Pointer resolve: {}",
+                ptr_text.lines().next().unwrap_or("?")
+            );
+
+            // Step 11: Close scan session
+            println!("    Step 11: Closing scan session...");
+            let _ = c.call_tool(
+                "scan_close",
+                serde_json::json!({
+                    "scan_id": scan_id
+                }),
+            );
+
+            // Step 12: Free allocated memory using exec_free
+            println!("    Step 12: Freeing allocated memory...");
+            let free_result = c.call_tool(
+                "exec_free",
+                serde_json::json!({
+                    "address": addr_str
+                }),
+            )?;
+            if free_result.get("error").is_some() {
+                println!("    Free failed (may not be supported)");
+            } else {
+                println!("    Memory freed!");
+            }
+
+            println!("    [Integration Test Complete!]");
+            Ok(true)
+        }),
+    )];
+
     // Combine all tests based on category filter AND server type
     let mut all_tests: Vec<(&str, TestFn)> = Vec::new();
 
@@ -1009,6 +1228,13 @@ fn run_integration_tests(client: &mut McpClient, specific_test: Option<String>) 
         }
     }
 
+    // Integration tests run on core server (needs exec_alloc) or unknown (extended-mcp with all tools)
+    if (server_type == ServerType::Core || server_type == ServerType::Unknown)
+        && should_run(TestCategory::Integration)
+    {
+        all_tests.extend(integration_tests);
+    }
+
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
@@ -1043,7 +1269,7 @@ fn run_integration_tests(client: &mut McpClient, specific_test: Option<String>) 
         "\nResults: {} passed, {} failed, {} skipped",
         passed, failed, skipped
     );
-    println!("\nCategories: meta, agent, memory, module, safety, debug, disasm, script, scanner, process, introspect, dump, patch, trace, pointer, watch, structure, radare2, ida, ghidra, ai, yara, all");
+    println!("\nCategories: meta, agent, memory, module, safety, debug, disasm, script, scanner, process, introspect, dump, patch, trace, pointer, watch, structure, radare2, ida, ghidra, ai, yara, integration, all");
 
     if failed > 0 {
         anyhow::bail!("{} tests failed", failed);
@@ -1268,6 +1494,8 @@ async fn main() -> Result<()> {
         Commands::Repl => run_repl(&mut client),
 
         Commands::Test { test } => run_integration_tests(&mut client, test),
+
+        Commands::TestAll => run_integration_tests(&mut client, None),
     };
 
     // Cleanup

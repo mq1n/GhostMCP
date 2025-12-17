@@ -14,7 +14,8 @@ use ghost_common::{
     Export, FunctionArg, FunctionCallOptions, HookId, Import, Instruction, MemoryRegion, Module,
     PointerExportFormat, PointerPath, PointerRescanOptions, PointerScanId, PointerScanOptions,
     RegionFilter, Registers, Result, ScanCompareType, ScanExportFormat, ScanId, ScanOptions,
-    ScanResult, ShellcodeExecMethod, ShellcodeExecOptions, StackFrame, Thread, ValueType,
+    ScanResult, ScanResultEx, ShellcodeExecMethod, ShellcodeExecOptions, StackFrame, Thread,
+    ValueType,
 };
 use ghost_core::execution::ExecutionEngine;
 use ghost_core::{
@@ -41,14 +42,12 @@ use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Memory::{
     VirtualAlloc, VirtualProtect, VirtualProtectEx, VirtualQuery, VirtualQueryEx,
     MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+    PAGE_READWRITE,
 };
 use windows::Win32::System::ProcessStatus::{
     EnumProcessModules, GetModuleBaseNameW, GetModuleFileNameExW, GetModuleInformation, MODULEINFO,
 };
-use windows::Win32::System::Threading::{
-    CreateThread, GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_QUERY_INFORMATION,
-    PROCESS_VM_READ,
-};
+use windows::Win32::System::Threading::{CreateThread, GetCurrentProcess};
 
 // SAFETY: InProcessBackend uses synchronization primitives (Mutex, RwLock) for all mutable state.
 // The process HANDLE is safe to share across threads as it's a kernel object reference.
@@ -131,6 +130,27 @@ fn parse_value_type(s: &str) -> Result<ValueType> {
         "bytes" | "aob" => Ok(ValueType::Bytes),
         _ => Err(Error::Internal(format!("Unknown value type: {}", s))),
     }
+}
+
+/// Convert a scan result into JSON with consistent address formatting.
+/// Adds both hex and decimal string representations to avoid client-side
+/// conversion mistakes when rendering large addresses.
+fn format_scan_result_json(result: &ScanResultEx) -> serde_json::Value {
+    let address = result.address;
+    let mut value = serde_json::to_value(result).unwrap_or_else(|_| serde_json::json!({}));
+
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert(
+            "address_hex".to_string(),
+            serde_json::json!(format!("0x{:X}", address)),
+        );
+        obj.insert(
+            "address_dec".to_string(),
+            serde_json::json!(address.to_string()),
+        );
+    }
+
+    value
 }
 
 fn now_millis() -> u64 {
@@ -377,10 +397,10 @@ pub struct AddressListEntry {
 
 impl InProcessBackend {
     pub fn new() -> Result<Self> {
-        let process_handle = unsafe {
-            let pid = GetCurrentProcessId();
-            OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid).ok()
-        };
+        // For in-process backend, we don't need to open a handle to ourselves.
+        // Using None will cause operations to use GetCurrentProcess() which is
+        // more efficient and has full access rights.
+        let process_handle = None;
 
         let backend = Self {
             process_handle,
@@ -1323,13 +1343,17 @@ impl InProcessBackend {
                 let results = self.scanner.get_results(scan_id, offset, limit);
                 let total = self.scanner.get_result_count(scan_id);
 
+                // Transform results to include hex address
+                let results_json: Vec<serde_json::Value> =
+                    results.iter().map(format_scan_result_json).collect();
+
                 tracing::debug!(target: "ghost_agent::backend", 
                     scan_id = scan_id.0,
-                    returned = results.len(),
+                    returned = results_json.len(),
                     total = total,
                     "Returning scan results");
                 Ok(serde_json::json!({
-                    "results": results,
+                    "results": results_json,
                     "total": total,
                     "offset": offset,
                     "limit": limit
@@ -1403,8 +1427,20 @@ impl InProcessBackend {
             // ================================================================
             "xref_to" => {
                 let addr = parse_address(&request.params["address"])?;
-                tracing::debug!(target: "ghost_agent::backend", address = format!("0x{:x}", addr), "Finding xrefs to address");
-                let xrefs = self.find_xrefs_to(addr)?;
+                let module_filter = request.params.get("module").and_then(|v| v.as_str());
+                let max_results = request
+                    .params
+                    .get("max_results")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(100) as usize;
+                tracing::debug!(
+                    target: "ghost_agent::backend",
+                    address = format!("0x{:x}", addr),
+                    module = ?module_filter,
+                    max_results = max_results,
+                    "Finding xrefs to address"
+                );
+                let xrefs = self.find_xrefs_to_filtered(addr, module_filter, max_results)?;
                 tracing::info!(target: "ghost_agent::backend", count = xrefs.len(), "Found xrefs");
                 Ok(serde_json::to_value(xrefs)?)
             }
@@ -2756,33 +2792,39 @@ impl MemoryAccess for InProcessBackend {
             let ptr = addr as *mut u8;
             let process = self.process_handle.unwrap_or_else(|| GetCurrentProcess());
 
-            // Change protection to writable - use VirtualProtectEx for remote process
-            let mut old_protect = PAGE_PROTECTION_FLAGS::default();
-            let protect_result = if self.process_handle.is_some() {
-                VirtualProtectEx(
+            // First validate memory is committed
+            let mut mbi = MEMORY_BASIC_INFORMATION::default();
+            let query_result = if self.process_handle.is_some() {
+                VirtualQueryEx(
                     process,
-                    ptr as *mut _,
-                    data.len(),
-                    PAGE_EXECUTE_READWRITE,
-                    &mut old_protect,
+                    Some(ptr as *const _),
+                    &mut mbi,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
                 )
             } else {
-                VirtualProtect(
-                    ptr as *mut _,
-                    data.len(),
-                    PAGE_EXECUTE_READWRITE,
-                    &mut old_protect,
+                VirtualQuery(
+                    Some(ptr as *const _),
+                    &mut mbi,
+                    std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
                 )
             };
 
-            if protect_result.is_err() {
+            if query_result == 0 {
                 return Err(Error::MemoryAccess {
                     address: addr,
-                    message: "VirtualProtect failed".into(),
+                    message: "VirtualQuery failed - invalid address".into(),
                 });
             }
 
-            // Write memory - use WriteProcessMemory for remote process
+            if mbi.State != MEM_COMMIT {
+                return Err(Error::MemoryAccess {
+                    address: addr,
+                    message: "Memory not committed".into(),
+                });
+            }
+
+            // For remote processes, try WriteProcessMemory directly first - it can write to
+            // read-only memory as the kernel handles protection internally
             if self.process_handle.is_some() {
                 let mut bytes_written: usize = 0;
                 let result = WriteProcessMemory(
@@ -2792,28 +2834,93 @@ impl MemoryAccess for InProcessBackend {
                     data.len(),
                     Some(&mut bytes_written),
                 );
-                if result.is_err() || bytes_written != data.len() {
-                    // Restore protection before returning error
-                    let mut tmp = PAGE_PROTECTION_FLAGS::default();
-                    let _ =
-                        VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
+
+                if result.is_ok() && bytes_written == data.len() {
+                    return Ok(());
+                }
+
+                // If direct write failed, try with VirtualProtectEx
+                let mut old_protect = PAGE_PROTECTION_FLAGS::default();
+                let protect_ok = VirtualProtectEx(
+                    process,
+                    ptr as *mut _,
+                    data.len(),
+                    PAGE_EXECUTE_READWRITE,
+                    &mut old_protect,
+                )
+                .is_ok()
+                    || VirtualProtectEx(
+                        process,
+                        ptr as *mut _,
+                        data.len(),
+                        PAGE_READWRITE,
+                        &mut old_protect,
+                    )
+                    .is_ok();
+
+                if !protect_ok {
+                    let err = std::io::Error::last_os_error();
                     return Err(Error::MemoryAccess {
                         address: addr,
-                        message: "WriteProcessMemory failed".into(),
+                        message: format!(
+                            "Cannot write to memory (protection: 0x{:X}, type: 0x{:X}): {}",
+                            mbi.Protect.0, mbi.Type.0, err
+                        ),
                     });
                 }
-            } else {
-                // Write directly for local process
-                std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data.len());
+
+                // Try write again after protection change
+                let result = WriteProcessMemory(
+                    process,
+                    ptr as *const _,
+                    data.as_ptr() as *const _,
+                    data.len(),
+                    Some(&mut bytes_written),
+                );
+
+                // Restore protection
+                let mut tmp = PAGE_PROTECTION_FLAGS::default();
+                let _ = VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
+
+                if result.is_err() || bytes_written != data.len() {
+                    return Err(Error::MemoryAccess {
+                        address: addr,
+                        message: "WriteProcessMemory failed after protection change".into(),
+                    });
+                }
+
+                return Ok(());
             }
+
+            // For local process, we need VirtualProtect before direct write
+            let mut old_protect = PAGE_PROTECTION_FLAGS::default();
+            let protect_ok = VirtualProtect(
+                ptr as *mut _,
+                data.len(),
+                PAGE_EXECUTE_READWRITE,
+                &mut old_protect,
+            )
+            .is_ok()
+                || VirtualProtect(ptr as *mut _, data.len(), PAGE_READWRITE, &mut old_protect)
+                    .is_ok();
+
+            if !protect_ok {
+                let err = std::io::Error::last_os_error();
+                return Err(Error::MemoryAccess {
+                    address: addr,
+                    message: format!(
+                        "VirtualProtect failed (protection: 0x{:X}, type: 0x{:X}): {}",
+                        mbi.Protect.0, mbi.Type.0, err
+                    ),
+                });
+            }
+
+            // Write directly for local process
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, data.len());
 
             // Restore protection
             let mut tmp = PAGE_PROTECTION_FLAGS::default();
-            if self.process_handle.is_some() {
-                let _ = VirtualProtectEx(process, ptr as *mut _, data.len(), old_protect, &mut tmp);
-            } else {
-                let _ = VirtualProtect(ptr as *mut _, data.len(), old_protect, &mut tmp);
-            }
+            let _ = VirtualProtect(ptr as *mut _, data.len(), old_protect, &mut tmp);
 
             Ok(())
         }
@@ -2891,7 +2998,7 @@ impl MemoryAccess for InProcessBackend {
         let readable_regions: Vec<_> = regions
             .iter()
             .filter(|r| r.state == ghost_common::MemoryState::Commit && r.protection.read)
-            .filter(|r| r.size <= 64 * 1024 * 1024) // Skip regions > 64MB
+            .filter(|r| r.size <= 512 * 1024 * 1024) // Skip regions > 512MB
             .filter(|r| {
                 let region_end = r.base + r.size;
                 if let Some(s) = start {
@@ -3022,7 +3129,7 @@ impl MemoryAccess for InProcessBackend {
         let readable_regions: Vec<_> = regions
             .iter()
             .filter(|r| r.state == ghost_common::MemoryState::Commit && r.protection.read)
-            .filter(|r| r.size <= 64 * 1024 * 1024) // Skip regions > 64MB
+            .filter(|r| r.size <= 512 * 1024 * 1024) // Skip regions > 512MB
             .collect();
 
         let total_readable = readable_regions.len();
@@ -3181,7 +3288,7 @@ impl MemoryAccess for InProcessBackend {
         let readable_regions: Vec<_> = regions
             .iter()
             .filter(|r| r.state == ghost_common::MemoryState::Commit && r.protection.read)
-            .filter(|r| r.size <= 64 * 1024 * 1024)
+            .filter(|r| r.size <= 512 * 1024 * 1024) // Skip regions > 512MB
             .filter(|r| {
                 // Apply range filters
                 let region_end = r.base + r.size;
@@ -3341,6 +3448,66 @@ impl MemoryAccess for InProcessBackend {
 
 /// Additional introspection helper methods for InProcessBackend
 impl InProcessBackend {
+    /// Find xrefs with optional module filter and configurable max results
+    /// This is a helper that allows the handler to pass optional parameters
+    fn find_xrefs_to_filtered(
+        &self,
+        addr: usize,
+        module_filter: Option<&str>,
+        max_results: usize,
+    ) -> Result<Vec<usize>> {
+        let mut all_xrefs = Vec::new();
+        let max_results = max_results.min(1000); // Cap at 1000 for safety
+
+        // Get modules to scan
+        let modules = self.get_modules()?;
+
+        // Filter modules if a specific module is requested
+        let modules_to_scan: Vec<_> = if let Some(filter) = module_filter {
+            let filter_lower = filter.to_lowercase();
+            modules
+                .into_iter()
+                .filter(|m| m.name.to_lowercase().contains(&filter_lower))
+                .collect()
+        } else {
+            // If no filter, only scan the main module to avoid timeout
+            // User should specify module for broader search
+            modules.into_iter().take(1).collect()
+        };
+
+        tracing::debug!(
+            target: "ghost_agent::backend",
+            module_count = modules_to_scan.len(),
+            "Scanning modules for xrefs"
+        );
+
+        for module in modules_to_scan {
+            tracing::trace!(
+                target: "ghost_agent::backend",
+                module = %module.name,
+                base = format!("0x{:x}", module.base),
+                size = module.size,
+                "Scanning module"
+            );
+
+            let xrefs = ghost_core::xrefs::scan_module_for_xrefs(
+                addr,
+                module.base,
+                module.size,
+                |scan_addr, size| self.read(scan_addr, size),
+                max_results - all_xrefs.len(),
+            )?;
+
+            all_xrefs.extend(xrefs);
+
+            if all_xrefs.len() >= max_results {
+                break;
+            }
+        }
+
+        Ok(all_xrefs)
+    }
+
     /// Helper to read u16 from memory (respects process_handle for remote processes)
     fn read_u16(&self, addr: usize) -> Result<u16> {
         let bytes = self.read(addr, 2)?;
@@ -3881,30 +4048,8 @@ impl StaticAnalysis for InProcessBackend {
     }
 
     fn find_xrefs_to(&self, addr: usize) -> Result<Vec<usize>> {
-        let mut all_xrefs = Vec::new();
-        let max_results = 1000;
-
-        // Scan all executable modules for xrefs
-        let modules = self.get_modules()?;
-
-        for module in modules {
-            // Only scan executable regions
-            let xrefs = ghost_core::xrefs::scan_module_for_xrefs(
-                addr,
-                module.base,
-                module.size,
-                |scan_addr, size| self.read(scan_addr, size),
-                max_results - all_xrefs.len(),
-            )?;
-
-            all_xrefs.extend(xrefs);
-
-            if all_xrefs.len() >= max_results {
-                break;
-            }
-        }
-
-        Ok(all_xrefs)
+        // Trait implementation - uses defaults (main module only, 100 results)
+        self.find_xrefs_to_filtered(addr, None, 100)
     }
 
     fn extract_strings(&self, module: &str, min_length: usize) -> Result<Vec<(usize, String)>> {
@@ -6436,6 +6581,34 @@ mod tests {
         let state = Arc::new(SharedState::new());
         let bus = Arc::new(EventBus::new());
         MultiClientBackend::new(backend, state, bus)
+    }
+
+    #[test]
+    fn test_format_scan_result_json_adds_consistent_hex() {
+        let sample = ScanResultEx {
+            address: 0x1800632A4F0,
+            value: vec![119, 0, 0, 0],
+            previous_value: Some(vec![162, 0, 0, 0]),
+            first_value: Some(vec![162, 0, 0, 0]),
+        };
+
+        let json = format_scan_result_json(&sample);
+
+        assert_eq!(
+            json["address"].as_u64().unwrap(),
+            sample.address as u64,
+            "numeric address should be preserved"
+        );
+        assert_eq!(
+            json["address_hex"].as_str().unwrap(),
+            "0x1800632A4F0",
+            "hex string should match numeric address"
+        );
+        assert_eq!(
+            json["address_dec"].as_str().unwrap(),
+            sample.address.to_string(),
+            "decimal string should match numeric address"
+        );
     }
 
     #[test]

@@ -956,18 +956,34 @@ mod live_tests {
                 .and_then(|n| n.as_str())
                 .unwrap_or("");
 
-            let result = match tool_name {
-                "mcp_capabilities" => json!({ "tool_count": tool_count }),
-                "patch_history" => json!({
-                    "patches": [],
-                    "returned": 0,
-                    "total": 0,
-                    "truncated": false
+            // Wrap tool results in ToolResult format: {"content": [{"text": "..."}], "isError": false}
+            let tool_result = match tool_name {
+                "mcp_capabilities" => {
+                    let inner = json!({ "tool_count": tool_count });
+                    json!({
+                        "content": [{"type": "text", "text": inner.to_string()}],
+                        "isError": false
+                    })
+                }
+                "patch_history" => {
+                    let inner = json!({
+                        "patches": [],
+                        "returned": 0,
+                        "total": 0,
+                        "truncated": false
+                    });
+                    json!({
+                        "content": [{"type": "text", "text": inner.to_string()}],
+                        "isError": false
+                    })
+                }
+                _ => json!({
+                    "content": [{"type": "text", "text": "{\"ok\": true}"}],
+                    "isError": false
                 }),
-                _ => json!({"ok": true}),
             };
 
-            json!({"jsonrpc": "2.0", "id": id, "result": result})
+            json!({"jsonrpc": "2.0", "id": id, "result": tool_result})
         } else {
             json!({"jsonrpc": "2.0", "id": id, "result": json!({"ok": true})})
         }
@@ -1244,11 +1260,33 @@ mod live_tests {
                 results.record_pass("patch_history_accessible");
                 println!("    patch_history response: {:?}", response);
 
-                // Verify response structure
-                let has_patches = response.get("patches").and_then(|p| p.as_array());
-                let returned = response.get("returned").and_then(|v| v.as_u64());
-                let total = response.get("total").and_then(|v| v.as_u64());
-                let truncated = response.get("truncated").and_then(|v| v.as_bool());
+                // Response is wrapped in ToolResult format: {"content": [{"text": "..."}], "isError": false}
+                // Extract and parse the inner JSON
+                let inner_json = response
+                    .get("content")
+                    .and_then(|c| c.get(0))
+                    .and_then(|c| c.get("text"))
+                    .and_then(|t| t.as_str())
+                    .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok());
+
+                // Verify response structure from inner JSON
+                let (has_patches, returned, total, truncated) = if let Some(ref inner) = inner_json
+                {
+                    (
+                        inner.get("patches").and_then(|p| p.as_array()),
+                        inner.get("returned").and_then(|v| v.as_u64()),
+                        inner.get("total").and_then(|v| v.as_u64()),
+                        inner.get("truncated").and_then(|v| v.as_bool()),
+                    )
+                } else {
+                    // Fallback: check raw response (for real servers)
+                    (
+                        response.get("patches").and_then(|p| p.as_array()),
+                        response.get("returned").and_then(|v| v.as_u64()),
+                        response.get("total").and_then(|v| v.as_u64()),
+                        response.get("truncated").and_then(|v| v.as_bool()),
+                    )
+                };
 
                 if has_patches.is_some()
                     && returned.is_some()
