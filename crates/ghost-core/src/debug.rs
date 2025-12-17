@@ -8,10 +8,18 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering};
 use std::sync::RwLock;
 use windows::Win32::System::Diagnostics::Debug::{
-    AddVectoredExceptionHandler, RemoveVectoredExceptionHandler, EXCEPTION_POINTERS,
+    AddVectoredExceptionHandler, GetThreadContext, RemoveVectoredExceptionHandler,
+    SetThreadContext, CONTEXT, CONTEXT_DEBUG_REGISTERS_AMD64, EXCEPTION_POINTERS,
+};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD, THREADENTRY32,
 };
 use windows::Win32::System::Memory::{
     VirtualProtect, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+};
+use windows::Win32::System::Threading::{
+    GetCurrentProcessId, GetCurrentThreadId, OpenThread, ResumeThread, SuspendThread,
+    THREAD_GET_CONTEXT, THREAD_SET_CONTEXT, THREAD_SUSPEND_RESUME,
 };
 
 /// Exception codes
@@ -39,6 +47,9 @@ static SINGLE_STEPPING: AtomicBool = AtomicBool::new(false);
 
 /// Address to restore breakpoint after single-step
 static STEP_RESTORE_ADDRESS: AtomicUsize = AtomicUsize::new(0);
+
+/// Hardware breakpoint slot being restored after single-step
+static HW_BP_RESTORE_SLOT: AtomicUsize = AtomicUsize::new(usize::MAX);
 
 /// Breakpoint manager for in-process debugging
 pub struct BreakpointManager {
@@ -291,9 +302,573 @@ pub fn set_one_shot_breakpoint(addr: usize) -> Result<BreakpointId> {
     Ok(id)
 }
 
-/// Set a hardware breakpoint (DR0-DR3)
+/// Hardware breakpoint condition types for DR7
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum HwBpCondition {
+    /// Break on execution
+    Execute = 0b00,
+    /// Break on write only
+    Write = 0b01,
+    /// Break on I/O read/write (not commonly used)
+    IoReadWrite = 0b10,
+    /// Break on read or write (but not execution)
+    ReadWrite = 0b11,
+}
+
+/// Hardware breakpoint length for DR7
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum HwBpLength {
+    /// 1 byte
+    Byte1 = 0b00,
+    /// 2 bytes
+    Byte2 = 0b01,
+    /// 8 bytes (only on x64)
+    Byte8 = 0b10,
+    /// 4 bytes
+    Byte4 = 0b11,
+}
+
+/// Validate hardware breakpoint address alignment
+/// Hardware breakpoints require proper alignment based on length
+#[cfg(target_arch = "x86_64")]
+fn validate_hw_bp_alignment(addr: usize, length: HwBpLength) -> Result<()> {
+    let alignment = match length {
+        HwBpLength::Byte1 => 1,
+        HwBpLength::Byte2 => 2,
+        HwBpLength::Byte4 => 4,
+        HwBpLength::Byte8 => 8,
+    };
+
+    if !addr.is_multiple_of(alignment) {
+        return Err(Error::Internal(format!(
+            "Hardware breakpoint address 0x{:x} is not aligned to {} bytes",
+            addr, alignment
+        )));
+    }
+    Ok(())
+}
+
+/// Set hardware breakpoint on all threads in the process
+#[cfg(target_arch = "x86_64")]
+fn set_hw_bp_on_all_threads(
+    slot: usize,
+    addr: usize,
+    condition: HwBpCondition,
+    length: HwBpLength,
+) -> Result<u32> {
+    // Validate slot
+    if slot >= MAX_HW_BREAKPOINTS {
+        return Err(Error::Internal(format!(
+            "Invalid breakpoint slot: {} (max {})",
+            slot,
+            MAX_HW_BREAKPOINTS - 1
+        )));
+    }
+
+    // Validate address is not null
+    if addr == 0 {
+        return Err(Error::Internal(
+            "Cannot set hardware breakpoint at null address".into(),
+        ));
+    }
+
+    // Validate alignment for data breakpoints
+    if !matches!(condition, HwBpCondition::Execute) {
+        validate_hw_bp_alignment(addr, length)?;
+    }
+
+    tracing::trace!(
+        target: "ghost_core::debug",
+        slot = slot,
+        addr = format!("0x{:x}", addr),
+        condition = ?condition,
+        length = ?length,
+        "Setting hardware breakpoint on all threads"
+    );
+
+    unsafe {
+        let current_pid = GetCurrentProcessId();
+        let current_tid = GetCurrentThreadId();
+
+        // Create a snapshot of all threads
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            .map_err(|e| Error::Internal(format!("CreateToolhelp32Snapshot failed: {}", e)))?;
+
+        // RAII guard for snapshot handle
+        struct SnapshotGuard(windows::Win32::Foundation::HANDLE);
+        impl Drop for SnapshotGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                }
+            }
+        }
+        let _snapshot_guard = SnapshotGuard(snapshot);
+
+        let mut thread_entry = THREADENTRY32 {
+            dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+            ..Default::default()
+        };
+
+        let mut threads_set = 0u32;
+        let mut threads_failed = 0u32;
+
+        if Thread32First(snapshot, &mut thread_entry).is_ok() {
+            loop {
+                // Only process threads belonging to our process
+                if thread_entry.th32OwnerProcessID == current_pid {
+                    let tid = thread_entry.th32ThreadID;
+
+                    // Open thread with required access
+                    if let Ok(thread_handle) = OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT,
+                        false,
+                        tid,
+                    ) {
+                        // RAII guard for thread handle
+                        struct ThreadGuard(windows::Win32::Foundation::HANDLE);
+                        impl Drop for ThreadGuard {
+                            fn drop(&mut self) {
+                                unsafe {
+                                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                                }
+                            }
+                        }
+                        let _thread_guard = ThreadGuard(thread_handle);
+
+                        // For non-current threads, we need to suspend first
+                        let is_current = tid == current_tid;
+                        if !is_current {
+                            SuspendThread(thread_handle);
+                        }
+
+                        // Get thread context
+                        let mut context: CONTEXT = std::mem::zeroed();
+                        context.ContextFlags = CONTEXT_DEBUG_REGISTERS_AMD64;
+
+                        let result = if GetThreadContext(thread_handle, &mut context).is_ok() {
+                            // Set address in appropriate DR register
+                            match slot {
+                                0 => context.Dr0 = addr as u64,
+                                1 => context.Dr1 = addr as u64,
+                                2 => context.Dr2 = addr as u64,
+                                3 => context.Dr3 = addr as u64,
+                                _ => {}
+                            }
+
+                            // Enable the breakpoint in DR7
+                            // Bits 0,2,4,6 are local enable bits for DR0-DR3
+                            let local_enable_bit = 1u64 << (slot * 2);
+                            context.Dr7 |= local_enable_bit;
+
+                            // Set condition and length in DR7
+                            // Bits 16-17 (condition) and 18-19 (length) for DR0, +4 for each DR
+                            let condition_offset = 16 + (slot * 4);
+                            // Clear existing condition/length bits
+                            context.Dr7 &= !(0xFu64 << condition_offset);
+                            // Set new condition and length
+                            let cond_len = ((length as u64) << 2) | (condition as u64);
+                            context.Dr7 |= cond_len << condition_offset;
+
+                            SetThreadContext(thread_handle, &context).is_ok()
+                        } else {
+                            false
+                        };
+
+                        // Always resume if we suspended
+                        if !is_current {
+                            ResumeThread(thread_handle);
+                        }
+
+                        if result {
+                            threads_set += 1;
+                        } else {
+                            threads_failed += 1;
+                        }
+                    }
+                }
+
+                // Move to next thread
+                thread_entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+                if Thread32Next(snapshot, &mut thread_entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        if threads_set == 0 {
+            return Err(Error::Internal(
+                "Failed to set hardware breakpoint on any thread".into(),
+            ));
+        }
+
+        if threads_failed > 0 {
+            tracing::warn!(
+                target: "ghost_core::debug",
+                slot = slot,
+                threads_set = threads_set,
+                threads_failed = threads_failed,
+                "Some threads failed to set hardware breakpoint"
+            );
+        }
+
+        tracing::debug!(
+            target: "ghost_core::debug",
+            slot = slot,
+            addr = format!("0x{:x}", addr),
+            threads = threads_set,
+            "Hardware breakpoint set on threads"
+        );
+
+        Ok(threads_set)
+    }
+}
+
+/// Clear hardware breakpoint on all threads in the process
+#[cfg(target_arch = "x86_64")]
+fn clear_hw_bp_on_all_threads(slot: usize) -> Result<u32> {
+    if slot >= MAX_HW_BREAKPOINTS {
+        return Err(Error::Internal(format!(
+            "Invalid breakpoint slot: {} (max {})",
+            slot,
+            MAX_HW_BREAKPOINTS - 1
+        )));
+    }
+
+    tracing::trace!(
+        target: "ghost_core::debug",
+        slot = slot,
+        "Clearing hardware breakpoint on all threads"
+    );
+
+    unsafe {
+        let current_pid = GetCurrentProcessId();
+        let current_tid = GetCurrentThreadId();
+
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            .map_err(|e| Error::Internal(format!("CreateToolhelp32Snapshot failed: {}", e)))?;
+
+        // Ensure snapshot is closed on all exit paths
+        struct SnapshotGuard(windows::Win32::Foundation::HANDLE);
+        impl Drop for SnapshotGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                }
+            }
+        }
+        let _snapshot_guard = SnapshotGuard(snapshot);
+
+        let mut thread_entry = THREADENTRY32 {
+            dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+            ..Default::default()
+        };
+
+        let mut threads_cleared = 0u32;
+        let mut threads_failed = 0u32;
+
+        if Thread32First(snapshot, &mut thread_entry).is_ok() {
+            loop {
+                if thread_entry.th32OwnerProcessID == current_pid {
+                    let tid = thread_entry.th32ThreadID;
+
+                    if let Ok(thread_handle) = OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT,
+                        false,
+                        tid,
+                    ) {
+                        // Ensure thread handle is closed on all exit paths
+                        struct ThreadGuard(windows::Win32::Foundation::HANDLE);
+                        impl Drop for ThreadGuard {
+                            fn drop(&mut self) {
+                                unsafe {
+                                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                                }
+                            }
+                        }
+                        let _thread_guard = ThreadGuard(thread_handle);
+
+                        let is_current = tid == current_tid;
+                        if !is_current {
+                            SuspendThread(thread_handle);
+                        }
+
+                        let mut context: CONTEXT = std::mem::zeroed();
+                        context.ContextFlags = CONTEXT_DEBUG_REGISTERS_AMD64;
+
+                        let result = if GetThreadContext(thread_handle, &mut context).is_ok() {
+                            // Clear DR register
+                            match slot {
+                                0 => context.Dr0 = 0,
+                                1 => context.Dr1 = 0,
+                                2 => context.Dr2 = 0,
+                                3 => context.Dr3 = 0,
+                                _ => {}
+                            }
+
+                            // Disable in DR7
+                            let local_enable_bit = 1u64 << (slot * 2);
+                            context.Dr7 &= !local_enable_bit;
+
+                            // Clear condition/length bits
+                            let condition_offset = 16 + (slot * 4);
+                            context.Dr7 &= !(0xFu64 << condition_offset);
+
+                            SetThreadContext(thread_handle, &context).is_ok()
+                        } else {
+                            false
+                        };
+
+                        // Always resume if we suspended
+                        if !is_current {
+                            ResumeThread(thread_handle);
+                        }
+
+                        if result {
+                            threads_cleared += 1;
+                        } else {
+                            threads_failed += 1;
+                        }
+                    }
+                }
+
+                thread_entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+                if Thread32Next(snapshot, &mut thread_entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        if threads_failed > 0 {
+            tracing::warn!(
+                target: "ghost_core::debug",
+                slot = slot,
+                threads_cleared = threads_cleared,
+                threads_failed = threads_failed,
+                "Some threads failed to clear hardware breakpoint"
+            );
+        }
+
+        tracing::debug!(
+            target: "ghost_core::debug",
+            slot = slot,
+            threads = threads_cleared,
+            "Hardware breakpoint cleared on threads"
+        );
+
+        Ok(threads_cleared)
+    }
+}
+
+/// Enable hardware breakpoint on all threads (set DR7 local enable bit)
+#[cfg(target_arch = "x86_64")]
+fn enable_hw_bp_on_all_threads(slot: usize) -> Result<u32> {
+    if slot >= MAX_HW_BREAKPOINTS {
+        return Err(Error::Internal(format!(
+            "Invalid breakpoint slot: {} (max {})",
+            slot,
+            MAX_HW_BREAKPOINTS - 1
+        )));
+    }
+
+    unsafe {
+        let current_pid = GetCurrentProcessId();
+        let current_tid = GetCurrentThreadId();
+
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            .map_err(|e| Error::Internal(format!("CreateToolhelp32Snapshot failed: {}", e)))?;
+
+        struct SnapshotGuard(windows::Win32::Foundation::HANDLE);
+        impl Drop for SnapshotGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                }
+            }
+        }
+        let _snapshot_guard = SnapshotGuard(snapshot);
+
+        let mut thread_entry = THREADENTRY32 {
+            dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+            ..Default::default()
+        };
+
+        let mut threads_enabled = 0u32;
+
+        if Thread32First(snapshot, &mut thread_entry).is_ok() {
+            loop {
+                if thread_entry.th32OwnerProcessID == current_pid {
+                    let tid = thread_entry.th32ThreadID;
+
+                    if let Ok(thread_handle) = OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT,
+                        false,
+                        tid,
+                    ) {
+                        struct ThreadGuard(windows::Win32::Foundation::HANDLE);
+                        impl Drop for ThreadGuard {
+                            fn drop(&mut self) {
+                                unsafe {
+                                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                                }
+                            }
+                        }
+                        let _thread_guard = ThreadGuard(thread_handle);
+
+                        let is_current = tid == current_tid;
+                        if !is_current {
+                            SuspendThread(thread_handle);
+                        }
+
+                        let mut context: CONTEXT = std::mem::zeroed();
+                        context.ContextFlags = CONTEXT_DEBUG_REGISTERS_AMD64;
+
+                        if GetThreadContext(thread_handle, &mut context).is_ok() {
+                            // Enable in DR7
+                            let local_enable_bit = 1u64 << (slot * 2);
+                            context.Dr7 |= local_enable_bit;
+
+                            if SetThreadContext(thread_handle, &context).is_ok() {
+                                threads_enabled += 1;
+                            }
+                        }
+
+                        if !is_current {
+                            ResumeThread(thread_handle);
+                        }
+                    }
+                }
+
+                thread_entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+                if Thread32Next(snapshot, &mut thread_entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        tracing::trace!(
+            target: "ghost_core::debug",
+            slot = slot,
+            threads = threads_enabled,
+            "Hardware breakpoint enabled on threads"
+        );
+
+        Ok(threads_enabled)
+    }
+}
+
+/// Disable hardware breakpoint on all threads (clear DR7 local enable bit, keep address)
+#[cfg(target_arch = "x86_64")]
+fn disable_hw_bp_on_all_threads(slot: usize) -> Result<u32> {
+    if slot >= MAX_HW_BREAKPOINTS {
+        return Err(Error::Internal(format!(
+            "Invalid breakpoint slot: {} (max {})",
+            slot,
+            MAX_HW_BREAKPOINTS - 1
+        )));
+    }
+
+    unsafe {
+        let current_pid = GetCurrentProcessId();
+        let current_tid = GetCurrentThreadId();
+
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
+            .map_err(|e| Error::Internal(format!("CreateToolhelp32Snapshot failed: {}", e)))?;
+
+        struct SnapshotGuard(windows::Win32::Foundation::HANDLE);
+        impl Drop for SnapshotGuard {
+            fn drop(&mut self) {
+                unsafe {
+                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                }
+            }
+        }
+        let _snapshot_guard = SnapshotGuard(snapshot);
+
+        let mut thread_entry = THREADENTRY32 {
+            dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+            ..Default::default()
+        };
+
+        let mut threads_disabled = 0u32;
+
+        if Thread32First(snapshot, &mut thread_entry).is_ok() {
+            loop {
+                if thread_entry.th32OwnerProcessID == current_pid {
+                    let tid = thread_entry.th32ThreadID;
+
+                    if let Ok(thread_handle) = OpenThread(
+                        THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT,
+                        false,
+                        tid,
+                    ) {
+                        struct ThreadGuard(windows::Win32::Foundation::HANDLE);
+                        impl Drop for ThreadGuard {
+                            fn drop(&mut self) {
+                                unsafe {
+                                    let _ = windows::Win32::Foundation::CloseHandle(self.0);
+                                }
+                            }
+                        }
+                        let _thread_guard = ThreadGuard(thread_handle);
+
+                        let is_current = tid == current_tid;
+                        if !is_current {
+                            SuspendThread(thread_handle);
+                        }
+
+                        let mut context: CONTEXT = std::mem::zeroed();
+                        context.ContextFlags = CONTEXT_DEBUG_REGISTERS_AMD64;
+
+                        if GetThreadContext(thread_handle, &mut context).is_ok() {
+                            // Disable in DR7 (clear local enable bit only)
+                            let local_enable_bit = 1u64 << (slot * 2);
+                            context.Dr7 &= !local_enable_bit;
+
+                            if SetThreadContext(thread_handle, &context).is_ok() {
+                                threads_disabled += 1;
+                            }
+                        }
+
+                        if !is_current {
+                            ResumeThread(thread_handle);
+                        }
+                    }
+                }
+
+                thread_entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+                if Thread32Next(snapshot, &mut thread_entry).is_err() {
+                    break;
+                }
+            }
+        }
+
+        tracing::trace!(
+            target: "ghost_core::debug",
+            slot = slot,
+            threads = threads_disabled,
+            "Hardware breakpoint disabled on threads"
+        );
+
+        Ok(threads_disabled)
+    }
+}
+
+/// Set a hardware breakpoint (DR0-DR3) for write access
 #[cfg(target_arch = "x86_64")]
 pub fn set_hardware_breakpoint(addr: usize) -> Result<BreakpointId> {
+    set_hardware_breakpoint_ex(addr, HwBpCondition::Write, HwBpLength::Byte4)
+}
+
+/// Set a hardware breakpoint with custom condition and length
+#[cfg(target_arch = "x86_64")]
+pub fn set_hardware_breakpoint_ex(
+    addr: usize,
+    condition: HwBpCondition,
+    length: HwBpLength,
+) -> Result<BreakpointId> {
     let mut manager = BREAKPOINT_MANAGER
         .write()
         .map_err(|e| Error::Internal(format!("Lock error: {}", e)))?;
@@ -309,6 +884,9 @@ pub fn set_hardware_breakpoint(addr: usize) -> Result<BreakpointId> {
         .position(|bp| bp.is_none())
         .ok_or_else(|| Error::Internal("No free hardware breakpoint slots".into()))?;
 
+    // Actually set the hardware breakpoint on all threads
+    set_hw_bp_on_all_threads(slot, addr, condition, length)?;
+
     let id = next_breakpoint_id();
     let bp = HardwareBreakpoint {
         id,
@@ -321,10 +899,7 @@ pub fn set_hardware_breakpoint(addr: usize) -> Result<BreakpointId> {
     manager.hardware_bps[slot] = Some(bp);
     manager.id_to_address.insert(id, addr);
 
-    // Hardware breakpoints are set per-thread via debug registers
-    // For now, we note that the breakpoint is registered but actual DR setup
-    // happens in the VEH handler or requires iterating all threads
-    tracing::debug!(target: "ghost_core::debug", id = id.0, addr = format!("0x{:x}", addr), slot = slot, "Hardware breakpoint registered");
+    tracing::info!(target: "ghost_core::debug", id = id.0, addr = format!("0x{:x}", addr), slot = slot, "Hardware breakpoint set");
     Ok(id)
 }
 
@@ -366,10 +941,15 @@ pub fn remove_breakpoint(id: BreakpointId) -> Result<()> {
     }
 
     // Check if it's a hardware breakpoint
-    for slot in &mut manager.hardware_bps {
+    for (slot_idx, slot) in manager.hardware_bps.iter_mut().enumerate() {
         if let Some(bp) = slot {
             if bp.id == id {
-                tracing::debug!(target: "ghost_core::debug", id = id.0, addr = format!("0x{:x}", addr), "Hardware breakpoint removed");
+                // Clear hardware breakpoint on all threads
+                #[cfg(target_arch = "x86_64")]
+                {
+                    let _ = clear_hw_bp_on_all_threads(slot_idx);
+                }
+                tracing::debug!(target: "ghost_core::debug", id = id.0, addr = format!("0x{:x}", addr), slot = slot_idx, "Hardware breakpoint removed");
                 *slot = None;
                 return Ok(());
             }
@@ -458,10 +1038,46 @@ pub fn set_breakpoint_enabled(id: BreakpointId, enabled: bool) -> Result<()> {
         return Ok(());
     }
 
-    for bp in manager.hardware_bps.iter_mut().flatten() {
-        if bp.id == id {
-            bp.enabled = enabled;
-            return Ok(());
+    for (slot_idx, slot) in manager.hardware_bps.iter_mut().enumerate() {
+        if let Some(bp) = slot {
+            if bp.id == id {
+                if enabled != bp.enabled {
+                    // Actually enable/disable the hardware breakpoint on all threads
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        if enabled {
+                            // Re-enable: set DR7 bits
+                            if let Err(e) = enable_hw_bp_on_all_threads(slot_idx) {
+                                tracing::warn!(
+                                    target: "ghost_core::debug",
+                                    slot = slot_idx,
+                                    error = %e,
+                                    "Failed to enable hardware breakpoint on some threads"
+                                );
+                            }
+                        } else {
+                            // Disable: clear DR7 bits (but keep DR address)
+                            if let Err(e) = disable_hw_bp_on_all_threads(slot_idx) {
+                                tracing::warn!(
+                                    target: "ghost_core::debug",
+                                    slot = slot_idx,
+                                    error = %e,
+                                    "Failed to disable hardware breakpoint on some threads"
+                                );
+                            }
+                        }
+                    }
+                    tracing::debug!(
+                        target: "ghost_core::debug",
+                        id = id.0,
+                        slot = slot_idx,
+                        enabled = enabled,
+                        "Hardware breakpoint enabled state changed"
+                    );
+                }
+                bp.enabled = enabled;
+                return Ok(());
+            }
         }
     }
 
@@ -543,7 +1159,51 @@ unsafe extern "system" fn veh_handler(exception_info: *mut EXCEPTION_POINTERS) -
             }
         }
         EXCEPTION_SINGLE_STEP => {
-            // Check if we need to restore a breakpoint
+            // First check DR6 for hardware breakpoint hits
+            let dr6 = (*context).Dr6;
+            let hw_bp_hit = dr6 & 0xF; // Bits 0-3 indicate DR0-DR3 triggered
+
+            if hw_bp_hit != 0 {
+                // Hardware breakpoint was hit
+                let mut handled = false;
+
+                if let Ok(mut manager) = BREAKPOINT_MANAGER.write() {
+                    if let Some(manager) = manager.as_mut() {
+                        for i in 0..MAX_HW_BREAKPOINTS {
+                            if (hw_bp_hit & (1 << i)) != 0 {
+                                if let Some(bp) = &mut manager.hardware_bps[i] {
+                                    if bp.enabled {
+                                        bp.hit_count += 1;
+                                        handled = true;
+                                        tracing::debug!(
+                                            target: "ghost_core::debug",
+                                            id = bp.id.0,
+                                            addr = format!("0x{:x}", bp.address),
+                                            slot = i,
+                                            hit_count = bp.hit_count,
+                                            "Hardware breakpoint hit"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if handled {
+                    // Clear DR6 status bits
+                    (*context).Dr6 &= !0xF;
+
+                    // For data breakpoints (read/write), we need to single-step past
+                    // the instruction and re-enable the breakpoint
+                    // Set Resume Flag (RF) to skip the breakpoint on the next instruction
+                    (*context).EFlags |= 0x10000; // RF flag
+
+                    return EXCEPTION_CONTINUE_EXECUTION;
+                }
+            }
+
+            // Check if we need to restore a software breakpoint
             if SINGLE_STEPPING.load(Ordering::SeqCst) {
                 let restore_addr = STEP_RESTORE_ADDRESS.swap(0, Ordering::SeqCst);
                 if restore_addr != 0 {
@@ -573,6 +1233,22 @@ unsafe extern "system" fn veh_handler(exception_info: *mut EXCEPTION_POINTERS) -
                     }
                 }
                 SINGLE_STEPPING.store(false, Ordering::SeqCst);
+                return EXCEPTION_CONTINUE_EXECUTION;
+            }
+
+            // Check if we need to restore a hardware breakpoint after single-step
+            let restore_slot = HW_BP_RESTORE_SLOT.swap(usize::MAX, Ordering::SeqCst);
+            if restore_slot < MAX_HW_BREAKPOINTS {
+                // Re-enable the hardware breakpoint that was temporarily disabled
+                if let Ok(manager) = BREAKPOINT_MANAGER.read() {
+                    if let Some(manager) = manager.as_ref() {
+                        if let Some(_bp) = &manager.hardware_bps[restore_slot] {
+                            // Re-enable in DR7
+                            let local_enable_bit = 1u64 << (restore_slot * 2);
+                            (*context).Dr7 |= local_enable_bit;
+                        }
+                    }
+                }
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
         }
@@ -686,5 +1362,122 @@ mod tests {
         // Listing without init should fail
         let result = list_breakpoints();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hw_bp_condition_values() {
+        assert_eq!(HwBpCondition::Execute as u8, 0b00);
+        assert_eq!(HwBpCondition::Write as u8, 0b01);
+        assert_eq!(HwBpCondition::IoReadWrite as u8, 0b10);
+        assert_eq!(HwBpCondition::ReadWrite as u8, 0b11);
+    }
+
+    #[test]
+    fn test_hw_bp_length_values() {
+        assert_eq!(HwBpLength::Byte1 as u8, 0b00);
+        assert_eq!(HwBpLength::Byte2 as u8, 0b01);
+        assert_eq!(HwBpLength::Byte8 as u8, 0b10);
+        assert_eq!(HwBpLength::Byte4 as u8, 0b11);
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_hw_bp_alignment_validation() {
+        // Byte1 - any alignment is fine
+        assert!(validate_hw_bp_alignment(0x1001, HwBpLength::Byte1).is_ok());
+        assert!(validate_hw_bp_alignment(0x1000, HwBpLength::Byte1).is_ok());
+
+        // Byte2 - must be 2-byte aligned
+        assert!(validate_hw_bp_alignment(0x1000, HwBpLength::Byte2).is_ok());
+        assert!(validate_hw_bp_alignment(0x1002, HwBpLength::Byte2).is_ok());
+        assert!(validate_hw_bp_alignment(0x1001, HwBpLength::Byte2).is_err());
+
+        // Byte4 - must be 4-byte aligned
+        assert!(validate_hw_bp_alignment(0x1000, HwBpLength::Byte4).is_ok());
+        assert!(validate_hw_bp_alignment(0x1004, HwBpLength::Byte4).is_ok());
+        assert!(validate_hw_bp_alignment(0x1001, HwBpLength::Byte4).is_err());
+        assert!(validate_hw_bp_alignment(0x1002, HwBpLength::Byte4).is_err());
+
+        // Byte8 - must be 8-byte aligned
+        assert!(validate_hw_bp_alignment(0x1000, HwBpLength::Byte8).is_ok());
+        assert!(validate_hw_bp_alignment(0x1008, HwBpLength::Byte8).is_ok());
+        assert!(validate_hw_bp_alignment(0x1004, HwBpLength::Byte8).is_err());
+    }
+
+    #[test]
+    fn test_dr7_bit_calculations() {
+        // Test local enable bit positions (slot * 2)
+        // DR0: slot=0, bit position = 0
+        // DR1: slot=1, bit position = 2
+        // DR2: slot=2, bit position = 4
+        // DR3: slot=3, bit position = 6
+        let dr0_enable = 1u64 << 0;
+        let dr1_enable = 1u64 << 2;
+        let dr2_enable = 1u64 << 4;
+        let dr3_enable = 1u64 << 6;
+        assert_eq!(dr0_enable, 0b0001);
+        assert_eq!(dr1_enable, 0b0100);
+        assert_eq!(dr2_enable, 0b010000);
+        assert_eq!(dr3_enable, 0b01000000);
+
+        // Test condition/length offset positions (16 + slot * 4)
+        // DR0: offset = 16
+        // DR1: offset = 20
+        // DR2: offset = 24
+        // DR3: offset = 28
+        let dr0_cond_offset = 16usize;
+        let dr1_cond_offset = 20usize;
+        let dr2_cond_offset = 24usize;
+        let dr3_cond_offset = 28usize;
+        assert_eq!(dr0_cond_offset, 16);
+        assert_eq!(dr1_cond_offset, 20);
+        assert_eq!(dr2_cond_offset, 24);
+        assert_eq!(dr3_cond_offset, 28);
+    }
+
+    #[test]
+    fn test_cond_len_encoding() {
+        // Test condition/length encoding: (length << 2) | condition
+        // Write (01) + Byte4 (11) = 0b1101 = 13
+        let cond_len = ((HwBpLength::Byte4 as u64) << 2) | (HwBpCondition::Write as u64);
+        assert_eq!(cond_len, 0b1101);
+
+        // Execute (00) + Byte1 (00) = 0b0000 = 0
+        let cond_len = ((HwBpLength::Byte1 as u64) << 2) | (HwBpCondition::Execute as u64);
+        assert_eq!(cond_len, 0b0000);
+
+        // ReadWrite (11) + Byte8 (10) = 0b1011 = 11
+        let cond_len = ((HwBpLength::Byte8 as u64) << 2) | (HwBpCondition::ReadWrite as u64);
+        assert_eq!(cond_len, 0b1011);
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_set_hardware_breakpoint_null_address() {
+        let _ = initialize_debugger();
+
+        // Setting breakpoint at null address should fail
+        let result = set_hardware_breakpoint(0);
+        assert!(result.is_err());
+
+        let _ = cleanup_debugger();
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_set_hardware_breakpoint_unaligned() {
+        let _ = initialize_debugger();
+
+        // Unaligned address for 4-byte write breakpoint should fail
+        let result = set_hardware_breakpoint(0x1001);
+        assert!(result.is_err());
+
+        let _ = cleanup_debugger();
+    }
+
+    #[test]
+    fn test_rf_flag_constant() {
+        // Resume Flag is bit 16 of EFLAGS
+        assert_eq!(0x10000u32, 1 << 16);
     }
 }
