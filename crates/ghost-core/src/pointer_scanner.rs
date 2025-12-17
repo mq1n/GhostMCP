@@ -42,8 +42,8 @@ pub struct PointerScanner {
     next_id: AtomicU32,
     /// Global cancel flag
     cancel_flag: Arc<AtomicBool>,
-    /// Current progress
-    current_progress: RwLock<Option<PointerScanProgress>>,
+    /// Per-session progress tracking
+    progress_map: RwLock<HashMap<PointerScanId, PointerScanProgress>>,
 }
 
 impl Default for PointerScanner {
@@ -58,7 +58,7 @@ impl PointerScanner {
             sessions: RwLock::new(HashMap::new()),
             next_id: AtomicU32::new(1),
             cancel_flag: Arc::new(AtomicBool::new(false)),
-            current_progress: RwLock::new(None),
+            progress_map: RwLock::new(HashMap::new()),
         }
     }
 
@@ -212,7 +212,7 @@ impl PointerScanner {
             elapsed_ms: 0,
             complete: false,
             cancelled: false,
-            phase: "Initializing".to_string(),
+            phase: "Building pointer map".to_string(),
         });
 
         // Filter regions based on options
@@ -244,18 +244,93 @@ impl PointerScanner {
                 .collect()
         };
 
-        // Find all pointers pointing to target (depth 1)
-        let mut all_paths: Vec<PointerPath> = Vec::new();
+        // OPTIMIZATION: Build pointer map ONCE by scanning all memory upfront
+        // This avoids re-reading memory for each depth level
+        // Map: pointer_value -> list of (source_address)
+        let mut pointer_map: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut addresses_scanned: u64 = 0;
         let mut bytes_scanned: u64 = 0;
         let mut regions_scanned: u32 = 0;
 
-        // Collect addresses that point to target at each depth level
-        // Key: address, Value: (offset from pointer value to target)
-        let mut current_targets: HashMap<usize, i64> = HashMap::new();
-        current_targets.insert(target, 0);
+        let alignment = options.offset_alignment as usize;
+        let step = if alignment > 0 {
+            alignment
+        } else {
+            POINTER_SIZE
+        };
+
+        for region in &scan_regions {
+            if self.is_cancelled() {
+                break;
+            }
+
+            let region_size = region.size;
+            bytes_scanned = bytes_scanned.saturating_add(region_size as u64);
+
+            let Some(data) = read_memory(region.base, region_size) else {
+                continue;
+            };
+
+            let mut offset = 0;
+            while offset + POINTER_SIZE <= data.len() {
+                addresses_scanned = addresses_scanned.saturating_add(1);
+
+                if let Ok(ptr_bytes) = data[offset..offset + POINTER_SIZE].try_into() {
+                    let ptr_value = usize::from_le_bytes(ptr_bytes);
+                    // Only store pointers that look valid (non-zero, reasonable range)
+                    if ptr_value > 0x10000 && ptr_value < 0x7FFF_FFFF_FFFF {
+                        let source_addr = region.base + offset;
+                        pointer_map.entry(ptr_value).or_default().push(source_addr);
+                    }
+                }
+                offset += step;
+            }
+
+            regions_scanned += 1;
+
+            // Update progress periodically
+            if regions_scanned.is_multiple_of(100) {
+                self.update_progress(PointerScanProgress {
+                    scan_id: id,
+                    current_depth: 0,
+                    max_depth: options.max_depth,
+                    pointers_at_depth: 0,
+                    total_pointers: 0,
+                    regions_scanned,
+                    regions_total: scan_regions.len() as u32,
+                    elapsed_ms: start_time.elapsed().as_millis() as u64,
+                    complete: false,
+                    cancelled: false,
+                    phase: "Building pointer map".to_string(),
+                });
+            }
+        }
+
+        info!(
+            "Built pointer map with {} unique targets in {}ms",
+            pointer_map.len(),
+            start_time.elapsed().as_millis()
+        );
+
+        if self.is_cancelled() {
+            return Ok(PointerScanStats {
+                addresses_scanned,
+                pointers_found: 0,
+                paths_per_depth: vec![],
+                elapsed_ms: start_time.elapsed().as_millis() as u64,
+                regions_scanned,
+                bytes_scanned,
+                scan_rate: 0,
+            });
+        }
+
+        // Now perform depth-based search using the pointer map
+        let mut all_paths: Vec<PointerPath> = Vec::new();
+        let mut current_targets: HashSet<usize> = HashSet::new();
+        current_targets.insert(target);
 
         let mut paths_per_depth: Vec<u64> = Vec::new();
+        let max_offset = options.max_offset as usize;
 
         for depth in 1..=options.max_depth {
             if self.is_cancelled() {
@@ -277,51 +352,24 @@ impl PointerScanner {
                 phase: format!("Scanning depth {}", depth),
             });
 
-            let mut next_targets: HashMap<usize, i64> = HashMap::new();
+            let mut next_targets: HashSet<usize> = HashSet::new();
             let mut depth_paths: u64 = 0;
 
-            for region in &scan_regions {
+            // For each current target, find pointers that point to it (within offset range)
+            for &target_addr in &current_targets {
                 if self.is_cancelled() {
                     break;
                 }
 
-                let region_size = region.size;
-                bytes_scanned = bytes_scanned.saturating_add(region_size as u64);
+                // Check pointer values in range [target - max_offset, target + max_offset]
+                let range_start = target_addr.saturating_sub(max_offset);
+                let range_end = target_addr.saturating_add(max_offset);
 
-                // Read region memory
-                let Some(data) = read_memory(region.base, region_size) else {
-                    continue;
-                };
-
-                // Scan for pointers within this region
-                let alignment = options.offset_alignment as usize;
-                let step = if alignment > 0 {
-                    alignment
-                } else {
-                    POINTER_SIZE
-                };
-
-                let mut offset = 0;
-                while offset + POINTER_SIZE <= data.len() {
-                    addresses_scanned = addresses_scanned.saturating_add(1);
-
-                    // Read pointer value at this offset
-                    let ptr_bytes: [u8; POINTER_SIZE] =
-                        match data[offset..offset + POINTER_SIZE].try_into() {
-                            Ok(b) => b,
-                            Err(_) => {
-                                offset += step;
-                                continue;
-                            }
-                        };
-                    let ptr_value = usize::from_le_bytes(ptr_bytes);
-
-                    // Check if this pointer points to any of our current targets
-                    for (&target_addr, &existing_offset) in &current_targets {
+                for ptr_value in range_start..=range_end {
+                    if let Some(sources) = pointer_map.get(&ptr_value) {
                         let diff = ptr_value as i64 - target_addr as i64;
-                        if diff.abs() <= options.max_offset {
-                            let source_addr = region.base + offset;
 
+                        for &source_addr in sources {
                             // Check if source is a valid static base
                             let (base_module, base_offset) =
                                 self.find_module_for_address(source_addr, &module_map);
@@ -330,11 +378,9 @@ impl PointerScanner {
 
                             // Skip non-static if static_only is set
                             if options.static_only && !is_static {
-                                // Still add to next_targets for deeper scanning
                                 if depth < options.max_depth {
-                                    next_targets.insert(source_addr, diff);
+                                    next_targets.insert(source_addr);
                                 }
-                                offset += step;
                                 continue;
                             }
 
@@ -342,20 +388,12 @@ impl PointerScanner {
                             if is_static {
                                 if let Some(ref mod_name) = base_module {
                                     if !base_modules.contains(&mod_name.to_lowercase()) {
-                                        offset += step;
                                         continue;
                                     }
                                 }
                             }
 
-                            // Build offset chain
-                            let offsets = vec![diff];
-                            if existing_offset != 0 {
-                                // This is a deeper level, prepend existing offsets
-                                // For now, we track the direct offset
-                            }
-
-                            let mut path = PointerPath::new(source_addr, offsets);
+                            let mut path = PointerPath::new(source_addr, vec![diff]);
                             path.base_module = base_module;
                             path.base_offset = base_offset;
                             path.resolved_address = Some(target);
@@ -368,17 +406,12 @@ impl PointerScanner {
                                 depth_paths += 1;
                             }
 
-                            // Add source to next level targets
                             if depth < options.max_depth {
-                                next_targets.insert(source_addr, 0);
+                                next_targets.insert(source_addr);
                             }
                         }
                     }
-
-                    offset += step;
                 }
-
-                regions_scanned += 1;
             }
 
             paths_per_depth.push(depth_paths);
@@ -733,12 +766,20 @@ impl PointerScanner {
         Ok(session.paths.len())
     }
 
-    /// Get current scan progress
-    pub fn get_progress(&self) -> Option<PointerScanProgress> {
-        self.current_progress
+    /// Get scan progress for a specific session
+    pub fn get_progress(&self, id: PointerScanId) -> Option<PointerScanProgress> {
+        self.progress_map
             .read()
             .ok()
-            .and_then(|guard| guard.clone())
+            .and_then(|guard| guard.get(&id).cloned())
+    }
+
+    /// Get the most recent scan progress (for backwards compatibility)
+    pub fn get_latest_progress(&self) -> Option<PointerScanProgress> {
+        self.progress_map
+            .read()
+            .ok()
+            .and_then(|guard| guard.values().max_by_key(|p| p.elapsed_ms).cloned())
     }
 
     /// Export results to a string in the specified format
@@ -834,8 +875,8 @@ impl PointerScanner {
     // --- Internal helpers ---
 
     fn update_progress(&self, progress: PointerScanProgress) {
-        if let Ok(mut guard) = self.current_progress.write() {
-            *guard = Some(progress);
+        if let Ok(mut guard) = self.progress_map.write() {
+            guard.insert(progress.scan_id, progress);
         }
     }
 
@@ -1400,8 +1441,10 @@ mod tests {
     #[test]
     fn test_get_progress_initial() {
         let scanner = PointerScanner::new();
-        // Initially no progress
-        let progress = scanner.get_progress();
+        // Initially no progress for any session
+        let progress = scanner.get_progress(PointerScanId(1));
         assert!(progress.is_none());
+        // Latest progress should also be none
+        assert!(scanner.get_latest_progress().is_none());
     }
 }

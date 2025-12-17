@@ -2227,7 +2227,8 @@ impl InProcessBackend {
                 }))
             }
             "pointer_scan_progress" => {
-                let progress = self.pointer_scanner.get_progress();
+                let scan_id = self.parse_pointer_scan_id(&request.params["scan_id"])?;
+                let progress = self.pointer_scanner.get_progress(scan_id);
 
                 if let Some(p) = progress {
                     tracing::trace!(
@@ -6848,12 +6849,12 @@ mod tests {
         let req = Request {
             method: "pointer_scan_progress".to_string(),
             id: 1,
-            params: json!({}),
+            params: json!({"scan_id": "1"}),
         };
         let result = backend.handle_request(&req);
         assert!(is_success(&result.result));
         let data = get_success_value(&result.result).unwrap();
-        // Should indicate no active scan
+        // Should indicate no active scan for this session
         assert_eq!(data["active"], false);
     }
 
