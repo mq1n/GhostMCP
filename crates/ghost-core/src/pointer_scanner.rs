@@ -33,6 +33,8 @@ const MAX_RESULTS_LIMIT: usize = 1_000_000;
 const MAX_DEPTH: u32 = 10;
 /// Pointer size (8 bytes for x64)
 const POINTER_SIZE: usize = std::mem::size_of::<usize>();
+/// Maximum unique pointer values to store (memory limit ~800MB for 100M entries)
+const MAX_POINTER_MAP_ENTRIES: usize = 100_000_000;
 
 /// Pointer scanner state management
 pub struct PointerScanner {
@@ -137,6 +139,10 @@ impl PointerScanner {
             .map_err(|e| Error::Internal(format!("Failed to acquire sessions lock: {}", e)))?;
 
         if sessions.remove(&id).is_some() {
+            // Also clean up progress entry for this session
+            if let Ok(mut progress) = self.progress_map.write() {
+                progress.remove(&id);
+            }
             info!("Closed pointer scan session {:?}", id);
             Ok(())
         } else {
@@ -279,8 +285,11 @@ impl PointerScanner {
                     let ptr_value = usize::from_le_bytes(ptr_bytes);
                     // Only store pointers that look valid (non-zero, reasonable range)
                     if ptr_value > 0x10000 && ptr_value < 0x7FFF_FFFF_FFFF {
-                        let source_addr = region.base + offset;
-                        pointer_map.entry(ptr_value).or_default().push(source_addr);
+                        // Check memory limit before adding
+                        if pointer_map.len() < MAX_POINTER_MAP_ENTRIES {
+                            let source_addr = region.base + offset;
+                            pointer_map.entry(ptr_value).or_default().push(source_addr);
+                        }
                     }
                 }
                 offset += step;
@@ -355,60 +364,74 @@ impl PointerScanner {
             let mut next_targets: HashSet<usize> = HashSet::new();
             let mut depth_paths: u64 = 0;
 
-            // For each current target, find pointers that point to it (within offset range)
-            for &target_addr in &current_targets {
+            // OPTIMIZATION: Instead of iterating over offset ranges (O(2*max_offset) per target),
+            // iterate over pointer_map entries once and check if they point near any target.
+            // This is O(pointer_map.len()) which is much faster when max_offset is large.
+            // Convert targets to sorted vec for efficient range checking
+            let mut sorted_targets: Vec<usize> = current_targets.iter().copied().collect();
+            sorted_targets.sort_unstable();
+
+            for (&ptr_value, sources) in &pointer_map {
                 if self.is_cancelled() {
                     break;
                 }
 
-                // Check pointer values in range [target - max_offset, target + max_offset]
-                let range_start = target_addr.saturating_sub(max_offset);
-                let range_end = target_addr.saturating_add(max_offset);
+                // Binary search to find targets within range of this pointer value
+                // A pointer at ptr_value points to address ptr_value, which matches target T
+                // if |ptr_value - T| <= max_offset
+                let search_start = ptr_value.saturating_sub(max_offset);
+                let search_end = ptr_value.saturating_add(max_offset);
 
-                for ptr_value in range_start..=range_end {
-                    if let Some(sources) = pointer_map.get(&ptr_value) {
-                        let diff = ptr_value as i64 - target_addr as i64;
+                // Find first target >= search_start
+                let start_idx = sorted_targets.partition_point(|&t| t < search_start);
 
-                        for &source_addr in sources {
-                            // Check if source is a valid static base
-                            let (base_module, base_offset) =
-                                self.find_module_for_address(source_addr, &module_map);
+                // Check all targets in range
+                for &target_addr in sorted_targets[start_idx..].iter() {
+                    if target_addr > search_end {
+                        break;
+                    }
 
-                            let is_static = base_module.is_some();
+                    let diff = ptr_value as i64 - target_addr as i64;
 
-                            // Skip non-static if static_only is set
-                            if options.static_only && !is_static {
-                                if depth < options.max_depth {
-                                    next_targets.insert(source_addr);
-                                }
-                                continue;
-                            }
+                    for &source_addr in sources {
+                        // Check if source is a valid static base
+                        let (base_module, base_offset) =
+                            self.find_module_for_address(source_addr, &module_map);
 
-                            // Check if base module is in allowed list
-                            if is_static {
-                                if let Some(ref mod_name) = base_module {
-                                    if !base_modules.contains(&mod_name.to_lowercase()) {
-                                        continue;
-                                    }
-                                }
-                            }
+                        let is_static = base_module.is_some();
 
-                            let mut path = PointerPath::new(source_addr, vec![diff]);
-                            path.base_module = base_module;
-                            path.base_offset = base_offset;
-                            path.resolved_address = Some(target);
-                            path.stability_score = if is_static { 0.5 } else { 0.1 };
-                            path.validation_count = 1;
-                            path.last_valid = true;
-
-                            if all_paths.len() < options.max_results {
-                                all_paths.push(path);
-                                depth_paths += 1;
-                            }
-
+                        // Skip non-static if static_only is set
+                        if options.static_only && !is_static {
                             if depth < options.max_depth {
                                 next_targets.insert(source_addr);
                             }
+                            continue;
+                        }
+
+                        // Check if base module is in allowed list
+                        if is_static {
+                            if let Some(ref mod_name) = base_module {
+                                if !base_modules.contains(&mod_name.to_lowercase()) {
+                                    continue;
+                                }
+                            }
+                        }
+
+                        let mut path = PointerPath::new(source_addr, vec![diff]);
+                        path.base_module = base_module;
+                        path.base_offset = base_offset;
+                        path.resolved_address = Some(target);
+                        path.stability_score = if is_static { 0.5 } else { 0.1 };
+                        path.validation_count = 1;
+                        path.last_valid = true;
+
+                        if all_paths.len() < options.max_results {
+                            all_paths.push(path);
+                            depth_paths += 1;
+                        }
+
+                        if depth < options.max_depth {
+                            next_targets.insert(source_addr);
                         }
                     }
                 }

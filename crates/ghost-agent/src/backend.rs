@@ -2252,10 +2252,15 @@ impl InProcessBackend {
                         "phase": p.phase
                     }))
                 } else {
-                    tracing::trace!(target: "ghost_agent::backend::pointer", "No active pointer scan");
+                    tracing::trace!(
+                        target: "ghost_agent::backend::pointer",
+                        scan_id = scan_id.0,
+                        "No progress for pointer scan session"
+                    );
                     Ok(serde_json::json!({
+                        "scan_id": scan_id.0.to_string(),
                         "active": false,
-                        "message": "No active pointer scan"
+                        "message": "No progress for this scan session"
                     }))
                 }
             }
